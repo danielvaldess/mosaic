@@ -1,144 +1,101 @@
 # AGENTS.md — FieldSight
 
-Guía de trabajo para agentes de IA y colaboradores humanos en este repositorio.
-Léelo completo antes de tocar código.
+FieldSight convierte observaciones de campo de ingenieros en una base estructurada
+de equipos médicos instalados, con IA **100% local** vía `@qvac/sdk`. Reto Philips del
+IA Hackathon powered by Tether.
 
-## Qué es esto
+## Regla de oro
 
-**FieldSight** convierte observaciones de campo de ingenieros (visitas a hospitales)
-en una base estructurada de equipos instalados, usando **IA 100% local** (QVAC).
-Reto de Philips del "IA Hackathon powered by Tether".
+**Toda inferencia debe correr on-device vía QVAC.** Nada de APIs de IA en la nube —
+descalifica la entrega ante ISD. El único tráfico de red permitido es la descarga de
+modelos del registry QVAC al primer uso (se cachean en `~/.qvac/models/`).
 
-### Regla de oro (obligatoria)
-
-**NO usar servicios de IA en la nube para la inferencia.** Toda extracción, voz y
-embeddings corre en el dispositivo vía `@qvac/sdk`. Cualquier llamada a una API de
-IA externa descalifica la entrega ante ISD. Esto se verifica antes de pasar a Philips.
-
-## Stack
-
-- **TypeScript / Node.js** ≥ 22.17 (ESM, `"type": "module"`), npm ≥ 10.9
-- **@qvac/sdk** 0.19 — worker local (Vulkan/CPU), descarga modelos del registry QVAC
-- **better-sqlite3** — almacén local
-- **tsx** para ejecución directa de `.ts`, **vitest** para tests, **tsc** para typecheck
-
-## Primeros pasos (setup)
+## Comandos
 
 ```bash
-npm install
-npm run seed          # carga el dataset dummy de Philips (20 obs, 13 clientes)
-npm test              # 18 tests
-npm run typecheck     # tsc --noEmit
-npm run cli           # asistente conversacional (descarga Qwen3-4B en el 1er uso)
-npm run server        # dashboard web → http://localhost:4173
+npm install            # requiere Node >=22.17 (ESM, "type":"module")
+npm run seed           # carga data/dummy_installed_base.json (20 obs, 13 clientes)
+npm run typecheck      # tsc --noEmit (strict + noUncheckedIndexedAccess)
+npm test               # vitest run
+npm run cli            # asistente conversacional (descarga Qwen3-4B ~2.5GB al 1er uso)
+npm run server         # dashboard → http://localhost:4173  (PORT env para cambiar)
 ```
 
-### Probar la IA local en una máquina sin GPU (o rápido)
+**En máquinas sin GPU / demos rápidas**, usa el modelo chico ya cacheado:
 
 ```bash
-FIELDSIGHT_EXTRACT_MODEL=small npm run cli      # usa Qwen3-0.6B (~382MB) ya cacheado
-node --import tsx scripts/smoke-extract.ts      # smoke test end-to-end con modelo real
+FIELDSIGHT_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB)
+node --import tsx scripts/smoke-extract.ts   # smoke test end-to-end con modelo real
 ```
 
-En la máquina con GPU (NVIDIA/AMD + Vulkan) usa el modelo por defecto `QWEN3_4B_INST_Q4_K_M`.
+Sin `small`, el CLI descarga 2.5GB y tarda minutos — no lo lances por accidente en CI o en el smoke.
 
-## Estructura
+**Nota**: no hay `npm run lint` (eslint no está configurado). La verificación es
+`npm run typecheck && npm test`. Los gates de CI (`.github/workflows/security-gates.yml`)
+corren TruffleHog + Semgrep + `npm audit` + typecheck + test — Semgrep/TruffleHog solo existen ahí.
+
+## Estructura y flujo
 
 ```
-src/
-  extract/prompt.ts    # prompt + JSON Schema de extracción (NO duplicar: editar aquí)
-  extract/extractor.ts # carga de modelo y llamadas completion() con QVAC
-  agent/agent.ts       # lógica conversacional: follow-ups, duplicados, estados, guardado
-  store/db.ts          # SQLite: customers, observations, equipment
-  store/seed.ts        # seed desde data/dummy_installed_base.json
-  insights/insights.ts # Customer 360, global stats, NL analytics
-  evidence/logger.ts   # log auditable JSONL + export CSV
-  voice/transcribe.ts  # STT on-device (Whisper vía QVAC)
-  cli.ts               # asistente por terminal
-  server.ts            # API del dashboard
-  server/index.html    # dashboard (diseño "film sheet", ver skill frontend-design)
-tests/                 # vitest (agent + insights)
-scripts/               # smoke-extract, voice-capture, convert-xlsx, security-local
-docs/                  # brief original de Philips
-data/                  # dataset dummy (xlsx + json) — la .db NO se versiona
-evidence/              # logs generados — NO se versionan (.gitignore)
+src/extract/prompt.ts    ← prompt + JSON Schema de extracción. UNICA fuente del contrato.
+src/extract/extractor.ts ← carga de modelo + completion() con responseFormat json_schema
+src/agent/agent.ts       ← conversación: follow-ups, duplicados, estados, guardado, anti-alucinación
+src/store/db.ts          ← SQLite (better-sqlite3); maps snake_case fila → camelCase tipo
+src/insights/insights.ts ← Customer 360, stats globales, NL analytics determinista
+src/evidence/logger.ts   ← log auditable (evidence/evidence.jsonl) + export CSV
+src/voice/transcribe.ts  ← STT Whisper on-device
+src/cli.ts               ← asistente por terminal (punto de entrada principal)
+src/server.ts            ← API del dashboard (sirve src/server/index.html)
 ```
 
-## Comandos útiles
+Flujo del agente: texto/voz → `extractObservation()` → `handleObservation()` (pregunta
+por datos faltantes, confirma, detecta duplicados) → `insertObservation()` → insights.
 
-| Comando | Descripción |
-|---------|-------------|
-| `npm run dev` | CLI con watch (tsx watch) |
-| `npm run cli` | Asistente conversacional |
-| `npm run server` | Dashboard web (PORT env para cambiar puerto) |
-| `npm test` | Tests unitarios (vitest) |
-| `npm run typecheck` | TypeScript estricto |
-| `npm run security:sca` | `npm audit` |
-| `scripts/security-local.sh` | Gates locales: typecheck + gitleaks + audit |
+## Quirks que rompen a los agentes
 
-Comandos dentro del CLI: `/help`, `/dashboard`, `/customers`, `/query <nl>`,
-`/evidence` (exporta CSV), `/exit`.
+- **`loadModel` devuelve `string`**, no `ModelId` (ese tipo no existe en el SDK). No lo importes.
+- **`CompletionStats`** (el tipo de `final.stats`) usa `timeToFirstToken`, `generatedTokens`,
+  `tokensPerSecond`, `backendDevice` — NO `ttftMs`/`outputTokens`. Importa el tipo, no hagas casts.
+- **Unión de descriptors** en `modelSrc` rompe la resolución de overloads de `loadModel`
+  (elige whisper). Si alternas modelos, castea `as typeof QWEN3_4B_INST_Q4_K_M` (ver `extractor.ts:81`).
+- **`normalizeModality`** devuelve `undefined` para modalidades no reconocidas — NO retornar el
+  input crudo. Y **`filterModalitiesMentioned()`** descarta equipos que el modelo inventó (alucina).
+  No eliminar esa defensa.
+- **DB mappings**: las filas de SQLite son snake_case (`customer_id`, `age_min`); los tipos son
+  camelCase. Usar los mappers de `db.ts` (`mapCustomer`, `mapEquipment`, `mapObservation`), no castear.
+- **`seedFromXlsx()` acepta una DB inyectada** para tests; los tests de DB usan `openDb(':memory:')`.
+- **Query de edad por filas, no promedios**: `queryInstalledBase` evalúa equipos viejos
+  individualmente ("2 MR viejos + 1 nuevo" debe matchear "MR >7 años").
+
+## Convenciones
+
+- Tipos con `import type`; `noUncheckedIndexedAccess` activo → `arr[i]` es `T | undefined`, usa `?? 0`.
+- Sin tests tautológicos (esperado que recalcula igual que el código): literales independientes.
+- Sin código muerto: si un módulo/import queda sin uso, elimínalo.
+- Comentarios solo explican "por qué", no "qué".
+- Cada load/inferencia/unload debe loguearse con `logEvidence()` — es la prueba de inferencia local.
+
+## Env vars
+
+- `FIELDSIGHT_EXTRACT_MODEL=small` — usa Qwen3-0.6B en vez del 4B por defecto
+- `FIELDSIGHT_AUTOSAVE=1` — guarda sin confirmación (modo no interactivo)
+- `FIELDSIGHT_OBSERVER` — identidad del observador (default "Field User 01")
+- `.env.example` documenta; nunca committear `.env`
 
 ## Modelo de datos
 
-- `customers` — cliente/facilidad + ciudad + país (unique name+city+country)
-- `observations` — quién reportó, cuándo, texto original, fuente (Voice/Text/Photo)
-- `equipment` — fila por modalidad: modality, quantity, brand, model, age (min/max/qualitative),
-  installation_year, status, confidence
+- `customers` (unique name+city+country) · `observations` · `equipment` (fila por modalidad)
+- **Status**: `Confirmed | Reported | Estimated | Unknown`. `Confirmed` solo tras confirmación
+  explícita del usuario; edad estimada → `Estimated`; lo desconocido → `Unknown` (nunca inventado).
 
-**Status por observación** (del brief de Philips): `Confirmed | Reported | Estimated | Unknown`.
-`Confirmed` solo tras confirmación explícita del usuario; edad estimada → `Estimated`;
-lo desconocido va como `Unknown` (nunca inventado).
+## Colaboración
 
-## Convenciones de código
+Rama por feature (`feat/<nombre>`), `typecheck && test` antes de push, PR contra `main`.
+CI valida secrets/SAST/SCA/tests — no subir dependencias nuevas sin pasar `npm audit`.
 
-1. **Tipos**: módulos importan tipos con `import type`. `strict` + `noUncheckedIndexedAccess`
-   activos — indexar arrays devuelve `T | undefined`, usar `?? 0` / guardas.
-2. **ModelId** es `string` (lo que devuelve `loadModel`). No importar `ModelId` del SDK (no existe).
-3. **Métricas QVAC**: los stats de `completion()` son `CompletionStats` (campos: `timeToFirstToken`,
-   `tokensPerSecond`, `promptTokens`, `generatedTokens`, `backendDevice`). Usar ese tipo, no casts.
-4. **Schema de extracción**: vive en `src/extract/prompt.ts`. Si cambias el contrato,
-   actualiza también `src/types.ts` (`Extraction`) y los tests.
-5. **Anti-alucinación**: `filterModalitiesMentioned()` descarta equipos que el modelo inventó.
-   No eliminar esta defensa; el modelo pequeño alucina.
-6. **Sin código muerto**: si un módulo/import deja de usarse, elimínalo (ver skill code-review).
-7. **Sin comentarios innecesarios**; los que existan explican "por qué", no "qué".
-8. **Evidence**: cada load/inferencia/unload debe loguearse en `logEvidence()` — es la prueba
-   auditable de que la inferencia fue local.
+## Referencias de contexto
 
-## Tests (TDD)
-
-- Tests por comportamiento a través de interfaces públicas, no internals.
-- **Prohibido tests tautológicos** (esperado que recalcula igual que el código): usar literales
-  independientes.
-- Tests de DB usan `openDb(':memory:')`; el seed acepta una DB inyectada.
-- Para añadir una feature: red → green → refactor (skill `tdd`).
-
-## Flujo de colaboración
-
-1. Crear rama por feature: `git checkout -b feat/<nombre>`
-2. Escribir test (rojo) → implementar (verde) → refactor
-3. `npm run typecheck && npm test` local antes de subir
-4. Push y abrir PR contra `main`
-5. CI corre gates: TruffleHog (secrets), Semgrep (SAST), `npm audit`, typecheck, tests
-
-## Seguridad
-
-- Nunca committear secretos. Variables en `.env` (ver `.env.example`).
-- `xlsx` NO es dependencia de producción (vuln sin fix GHSA-4r6h-8v6p-xvw6):
-  el dataset se pre-convierte a JSON con `scripts/convert-xlsx.mjs` en build-time.
-- `.gitignore` excluye: `.env`, `data/*.db*`, `evidence/`, `node_modules/`, `.qvac/`.
-
-## Ambiente de runtime
-
-- La GPU real es una máquina remota (NVIDIA/AMD, Vulkan ≥ 1.4). Este WSL es solo desarrollo.
-- Requisitos QVAC en Linux: `g++ ≥ 13`, Vulkan runtime ≥ 1.4, usuario en grupos `render`,`video`.
-- Modelos se cachean en `~/.qvac/models/` (multi-GB). No borrar salvo liberar espacio.
-
-## Preguntas frecuentes
-
-- **¿Dónde cambio el modelo de extracción?** `EXTRACTION_MODEL` en `src/extract/extractor.ts`.
-  Acepta constantes del registry o rutas `.gguf` locales.
-- **¿La IA usa internet?** Solo para descargar modelos del registry QVAC al primer uso.
-  La inferencia es 100% local/offline.
-- **¿Cómo pruebo sin GPU?** `FIELDSIGHT_EXTRACT_MODEL=small` (Qwen3-0.6B) o `scripts/smoke-extract.ts`.
+- `README.md` — visión, pipeline, decisiones de diseño.
+- `docs/Challenge_Brief.docx` — brief original de Philips (problema, MVP, stretch goals).
+- Skill `frontend-design` (diseño del dashboard, estética "film sheet") y `tdd`/`code-review`
+  para el flujo de desarrollo.

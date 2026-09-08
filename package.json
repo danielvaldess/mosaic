@@ -13,10 +13,8 @@
     "cli": "tsx src/cli.ts",
     "server": "tsx src/server.ts",
     "seed": "tsx src/store/seed.ts",
-    "extract:test": "tsx src/extract/test.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts",
     "security:secrets": "trufflehog filesystem . --fail",
     "security:sast": "semgrep --config p/security-audit src --error",
     "security:sca": "npm audit"
