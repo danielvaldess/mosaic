@@ -1,0 +1,40 @@
+{
+  "name": "fieldsight",
+  "version": "0.1.0",
+  "description": "FieldSight - Customer Installed Base Intelligence. Captura conversacional de observaciones de campo con IA local (QVAC).",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.17"
+  },
+  "scripts": {
+    "dev": "tsx watch src/cli.ts",
+    "cli": "tsx src/cli.ts",
+    "server": "tsx src/server.ts",
+    "seed": "tsx src/store/seed.ts",
+    "extract:test": "tsx src/extract/test.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "security:secrets": "trufflehog filesystem . --fail",
+    "security:sast": "semgrep --config p/security-audit src --error",
+    "security:sca": "npm audit"
+  },
+  "dependencies": {
+    "@qvac/sdk": "^0.19.0",
+    "better-sqlite3": "^13.0.3",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.8.0",
+    "vitest": "^5.0.0"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "better-sqlite3": true
+  }
+}
