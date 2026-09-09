@@ -1,12 +1,21 @@
-# FieldSight
+# Mosaic
+**Una visión completa, pieza por pieza.**
 
-**Customer Installed Base Intelligence** — transforma observaciones de campo en una vista viva, confiable y accionable de la base instalada de equipos médicos.
+### ¿Qué es?
+**Mosaic** es una **web app de inteligencia de base instalada** que transforma las observaciones realizadas durante visitas a hospitales en información estructurada, confiable y accionable. Su concepto parte de una idea simple: **cada observación es una pieza y, al conectar esas piezas, se construye una visión completa de cada cliente.**
 
-Hackathon Challenge de Philips · IA Hackathon powered by Tether (QVAC). Todo el razonamiento corre **localmente** con `@qvac/sdk` — sin cloud, sin API keys.
+### Problemática
+Ingenieros de servicio, vendedores y especialistas visitan hospitales y clínicas y recopilan información sobre los equipos que encuentran. Sin embargo, gran parte de este conocimiento queda disperso en notas personales, conversaciones o memoria, además de ser parcial e inconsistente. Esto dificulta que las organizaciones conozcan con claridad **qué equipos están instalados, dónde se encuentran y qué tan actualizada y confiable es la información disponible.**
 
-## ¿Qué resuelve?
+### ¿Qué resuelve?
+Mosaic permite registrar una observación mediante **texto o voz**, utilizando lenguaje natural en lugar de formularios complejos. La IA interpreta la información, identifica los datos relevantes del equipo, solicita información faltante, detecta posibles duplicados y asigna un nivel de confianza a cada observación. Así, las observaciones realizadas por diferentes colaboradores se conectan para construir una **visión consolidada de la base instalada por cliente y geografía.**
 
-Ingenieros de servicio y ventas visitan hospitales todos los días y ven resonadores (MR), tomógrafos (CT), ecógrafos (Ultrasound), etc. Esa información queda en notas o memoria. FieldSight permite capturar la observación **con una conversación** (texto o voz), extrae la estructura con IA local, hace preguntas cuando falta lo importante, detecta duplicados y construye un repositorio estructurado por cliente y geografía.
+### ¿A quién ayuda?
+Mosaic facilita el trabajo de los **colaboradores de campo, equipos de servicio y ventas** al simplificar la captura y consulta de información. Al mismo tiempo, proporciona a gerentes y organizaciones una visión más clara de su base instalada para identificar equipos antiguos, información que requiere verificación y posibles oportunidades de renovación.
+
+### ¿Qué identifica?
+Mosaic puede extraer información como **cliente, ciudad, país, modalidad, cantidad, marca, modelo y antigüedad**, cuando estos datos están disponibles. También identifica datos faltantes, posibles duplicados y estados de confianza como **Confirmed, Reported, Estimated o Unknown**, evitando asumir o inventar información que no haya sido proporcionada.
+
 
 ## Pipeline
 
