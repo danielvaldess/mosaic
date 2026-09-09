@@ -12,6 +12,7 @@
     "dev": "tsx watch src/cli.ts",
     "cli": "tsx src/cli.ts",
     "server": "tsx src/server.ts",
+    "web": "tsx src/web-server.ts",
     "seed": "tsx src/store/seed.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
