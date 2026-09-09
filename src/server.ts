@@ -1,13 +1,12 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { openDb, allCustomers } from './store/db.js'
 import { customer360, globalStats } from './insights/insights.js'
 
 const DB = openDb()
 const PORT = Number(process.env.PORT ?? 4173)
 
-const HTML = readFileSync(join(process.cwd(), 'src', 'server', 'index.html'), 'utf8')
+const HTML = readFileSync(new URL('./server/index.html', import.meta.url), 'utf8')
 
 function json(res: import('node:http').ServerResponse, data: unknown, code = 200) {
   res.writeHead(code, { 'Content-Type': 'application/json' })
@@ -37,7 +36,7 @@ createServer((req, res) => {
     return
   }
   json(res, { error: 'not found' }, 404)
-}).listen(PORT, () => {
+}).listen(PORT, '127.0.0.1', () => {
   console.log(`FieldSight dashboard → http://localhost:${PORT}`)
 })
 

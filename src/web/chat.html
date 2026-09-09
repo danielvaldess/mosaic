@@ -246,6 +246,9 @@
   }
   .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent) !important; font-weight: 600; }
   .btn-cancel { background: var(--surface2); color: var(--muted); }
+.msg button { margin: 8px 8px 0 0; padding: 8px 12px; cursor: pointer; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.msg input { margin-top: 8px; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.msg button:disabled, .msg input:disabled { opacity: .5; cursor: default; }
 </style>
 </head>
 <body>
@@ -260,7 +263,7 @@
 </header>
 <main>
   <div id="messages">
-    <div class="msg system">Describe medical equipment you observed at a hospital. The AI will extract structured data locally using your GPU.</div>
+    <div class="msg system">Describe medical equipment you observed at a hospital. The AI will extract structured data locally on your device.</div>
   </div>
   <div id="input-area">
     <div class="input-wrap">
@@ -271,230 +274,81 @@
   </div>
 </main>
 
-<div id="customer-modal">
-  <div class="modal-box">
-    <h3>Customer Information</h3>
-    <label>Hospital / Customer name *</label>
-    <input id="cm-name" placeholder="e.g. Hospital Central" />
-    <label>City</label>
-    <input id="cm-city" placeholder="e.g. Mexico City" />
-    <label>Country</label>
-    <input id="cm-country" placeholder="e.g. Mexico" />
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeCustomerModal()">Cancel</button>
-      <button class="btn-primary" onclick="submitCustomer()">Continue</button>
-    </div>
-  </div>
-</div>
-
 <script>
 const messages = document.getElementById('messages');
 const input = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
-let pendingMessage = '';
-let pendingHistory = [];
-let awaitingCustomer = false;
-
-input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-});
-input.addEventListener('input', () => {
-  input.style.height = 'auto';
-  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-});
-
-function addMessage(text, type, extra = '') {
-  const div = document.createElement('div');
-  div.className = `msg ${type}`;
-  div.innerHTML = text + extra;
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
-  return div;
+let sessionId;
+let busy = false;
+function addMessage(text, type) {
+  const div = document.createElement('div'); div.className = 'msg ' + type;
+  div.textContent = text; div.style.whiteSpace = 'pre-wrap'; messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight; return div;
 }
-
-function showTyping() {
-  const div = document.createElement('div');
-  div.className = 'msg ai';
-  div.id = 'typing';
-  div.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
+function disableOldControls() {
+  messages.querySelectorAll('button,input').forEach(el => el.disabled = true);
 }
-
-function removeTyping() {
-  const t = document.getElementById('typing');
-  if (t) t.remove();
-}
-
-function formatEquipment(obs) {
-  if (!obs || !obs.equipment || !obs.equipment.length) return '';
-  let html = '<div class="equipment-card"><h4>Extracted Equipment</h4>';
-  for (const e of obs.equipment) {
-    html += `<div class="eq-row"><span class="eq-label">${e.quantity}× ${e.modality}</span><span>${e.brand !== 'Unknown' ? e.brand : ''} ${e.model !== 'Unknown' ? e.model : ''}</span></div>`;
-    if (e.age) {
-      const age = e.age.qualitative || (e.age.min !== undefined ? `${e.age.min}-${e.age.max || e.age.min}y` : '—');
-      html += `<div class="eq-row"><span class="eq-label">Age</span><span>${age}</span></div>`;
+function showReply(data) {
+  addMessage(data.reply, 'ai');
+  if (data.observation) {
+    const lines = data.observation.equipment.map(e => e.quantity + '× ' + e.modality + ' · ' + (e.brand || 'Unknown') + ' · ' + (e.model || 'Unknown') + (e.age ? ' · Age: ' + (e.age.qualitative || [e.age.min, e.age.max].filter(v => v != null).join('–')) : ''));
+    addMessage(lines.join('\n'), 'system');
+  }
+  const pendingFollowUps = data.followUps || [];
+  for (const followUp of pendingFollowUps.slice(0, 1)) {
+    const box = addMessage(followUp.question, 'ai');
+    if (pendingFollowUps.length > 1) {
+      const remaining = document.createElement('small');
+      remaining.textContent = ` (${pendingFollowUps.length} details remaining)`;
+      box.appendChild(remaining);
+    }
+    const answer = document.createElement('input'); answer.placeholder = 'Your answer...';
+    const button = document.createElement('button'); button.textContent = 'Send';
+    const submit = () => { if (answer.value.trim()) request(answer.value.trim(), followUp.question); };
+    button.onclick = submit; answer.onkeydown = e => { if (e.key === 'Enter') submit(); };
+    box.append(document.createElement('br'), answer, button);
+  }
+  if (data.observation?.equipment.length && !data.saved) {
+    const box = addMessage('Review the equipment above before saving.', 'system');
+    for (const [label, command] of data.duplicates?.length ? [['Save anyway', 'save anyway'], ['Skip', 'skip']] : [['Confirm and save', 'confirm'], ['Discard', 'skip']]) {
+      const button = document.createElement('button'); button.textContent = label; button.onclick = () => request(command); box.append(button);
     }
   }
-  html += '</div>';
-  return html;
 }
-
-function addFollowUps(followUps, originalInput, customerInfo) {
-  if (!followUps || !followUps.length) return;
-  const container = document.createElement('div');
-  container.className = 'msg ai';
-  let html = '<div class="followups">';
-  for (let i = 0; i < followUps.length; i++) {
-    const f = followUps[i];
-    html += `<div class="fq">
-      <span class="q-label">${f.intent}</span>
-      ${f.question}
-      <div class="fq-input">
-        <input id="fu-${i}" placeholder="Your answer..." onkeydown="if(event.key==='Enter')answerFollowUp(${i})" />
-        <button onclick="answerFollowUp(${i})">Send</button>
-      </div>
-    </div>`;
-  }
-  html += '</div>';
-  container.innerHTML = html;
-  container.dataset.originalInput = originalInput;
-  container.dataset.followUps = JSON.stringify(followUps);
-  container.dataset.customerInfo = JSON.stringify(customerInfo);
-  messages.appendChild(container);
-  messages.scrollTop = messages.scrollHeight;
-}
-
-window.answerFollowUp = async function(index) {
-  const inputEl = document.getElementById(`fu-${index}`);
-  const answer = inputEl.value.trim();
-  if (!answer) return;
-  inputEl.disabled = true;
-
-  const container = inputEl.closest('.msg');
-  const originalInput = container.dataset.originalInput;
-  const followUps = JSON.parse(container.dataset.followUps);
-  const customerInfo = JSON.parse(container.dataset.customerInfo);
-  const question = followUps[index].question;
-
-  addMessage(answer, 'user');
-  showTyping();
-
+async function request(message, question) {
+  if (busy) return;
+  busy = true; sendBtn.disabled = true;
+  const activeControls = [...messages.querySelectorAll('button,input')].filter(el => !el.disabled);
+  disableOldControls(); addMessage(message, 'user');
+  const waiting = addMessage('Processing locally…', 'system');
   try {
-    const res = await fetch('/api/followup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originalInput, followUpQuestion: question, answer, customerInfo }),
-    });
+    const res = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message, question, sessionId}) });
     const data = await res.json();
-    removeTyping();
-    addMessage(data.reply, 'ai', formatEquipment(data.observation) + `<div class="meta">⚡ ${data.ms}ms · local GPU</div>`);
-    if (data.followUps && data.followUps.length) {
-      addFollowUps(data.followUps, originalInput, { ...customerInfo, ...data.observation?.customerId && {} });
-    }
-  } catch (e) {
-    removeTyping();
-    addMessage('Error: ' + e.message, 'ai');
-  }
-};
-
+    if (!res.ok) { if (res.status === 410) sessionId = undefined; throw new Error(data.error || 'Request failed'); }
+    sessionId = data.sessionId; showReply(data);
+  } catch (error) {
+    activeControls.forEach(el => el.disabled = false);
+    addMessage('Error: ' + error.message, 'ai');
+  } finally { waiting.remove(); busy = false; sendBtn.disabled = false; input.focus(); }
+}
 window.send = async function() {
-  const text = input.value.trim();
-  if (!text || sendBtn.disabled) return;
-
-  if (text.toLowerCase() === '/help') {
-    addMessage('Commands: /help, /dashboard, /customers, /query &lt;nl&gt;, /evidence', 'system');
-    input.value = '';
+  const text = input.value.trim(); if (!text || busy) return; input.value = '';
+  if (text === '/help') { addMessage('/dashboard · /customers · /query <text> · /evidence · /new\nDescribe an observation, answer questions, then confirm or skip.', 'system'); return; }
+  if (text === '/dashboard') return showDashboard();
+  if (text === '/customers') return window.open('/api/customers', '_blank');
+  if (text === '/evidence') return downloadEvidence();
+  if (text.startsWith('/query ')) {
+    try { const res = await fetch('/api/query?q=' + encodeURIComponent(text.slice(7))); const data = await res.json(); if (!res.ok) throw new Error(data.error); addMessage(JSON.stringify(data, null, 2), 'ai'); }
+    catch(error) { addMessage('Error: ' + error.message, 'ai'); }
     return;
   }
-  if (text.toLowerCase() === '/dashboard' || text.toLowerCase() === '/customers') {
-    window.open('/api/stats', '_blank');
-    input.value = '';
-    return;
-  }
-  if (text.toLowerCase() === '/evidence') {
-    window.location.href = '/api/evidence';
-    input.value = '';
-    return;
-  }
-
-  addMessage(text, 'user');
-  pendingMessage = text;
-  input.value = '';
-  input.style.height = 'auto';
-  sendBtn.disabled = true;
-  showTyping();
-
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history: pendingHistory }),
-    });
-    const data = await res.json();
-    removeTyping();
-
-    if (data.needCustomerInfo) {
-      awaitingCustomer = true;
-      addMessage(data.reply, 'ai');
-      document.getElementById('customer-modal').classList.add('active');
-      document.getElementById('cm-name').focus();
-    } else {
-      pendingHistory.push({ role: 'user', content: text });
-      pendingHistory.push({ role: 'assistant', content: data.reply });
-      addMessage(data.reply, 'ai', formatEquipment(data.observation) + `<div class="meta">⚡ ${data.ms}ms · local GPU</div>`);
-      if (data.followUps && data.followUps.length) {
-        addFollowUps(data.followUps, text, data.observation);
-      }
-    }
-  } catch (e) {
-    removeTyping();
-    addMessage('Error: ' + e.message, 'ai');
-  }
-  sendBtn.disabled = false;
-  input.focus();
+  await request(text);
 };
-
-window.closeCustomerModal = function() {
-  document.getElementById('customer-modal').classList.remove('active');
-  awaitingCustomer = false;
-};
-
-window.submitCustomer = async function() {
-  const name = document.getElementById('cm-name').value.trim();
-  if (!name) return;
-  const city = document.getElementById('cm-city').value.trim() || 'Unknown';
-  const country = document.getElementById('cm-country').value.trim() || 'Unknown';
-  closeCustomerModal();
-  showTyping();
-
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `${pendingMessage}. Customer: ${name}, ${city}, ${country}`,
-        history: pendingHistory,
-      }),
-    });
-    const data = await res.json();
-    removeTyping();
-    pendingHistory.push({ role: 'user', content: pendingMessage });
-    pendingHistory.push({ role: 'assistant', content: data.reply });
-    addMessage(data.reply, 'ai', formatEquipment(data.observation) + `<div class="meta">⚡ ${data.ms}ms · local GPU</div>`);
-    if (data.followUps && data.followUps.length) {
-      addFollowUps(data.followUps, pendingMessage, data.observation);
-    }
-  } catch (e) {
-    removeTyping();
-    addMessage('Error: ' + e.message, 'ai');
-  }
-};
-
-window.showDashboard = function() { window.open('/', '_blank'); };
-window.downloadEvidence = function() { window.location.href = '/api/evidence'; };
-
+window.showDashboard = () => window.open('/dashboard', '_blank');
+window.downloadEvidence = () => { window.location.href = '/api/evidence'; };
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 input.focus();
 </script>
+
 </body>
 </html>

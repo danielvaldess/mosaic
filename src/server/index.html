@@ -105,12 +105,12 @@
 </main>
 <script>
 const $ = (s) => document.querySelector(s)
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))
 async function load() {
   const [stats, customers] = await Promise.all([
     fetch('/api/stats').then(r => r.json()),
     fetch('/api/customers').then(r => r.json()),
   ])
-  const agedPct = stats.totalUnits ? Math.round(stats.refreshCandidates.reduce((s,c)=>s+c.totalUnits,0)/stats.totalUnits*100) : 0
   $('#readout').innerHTML = `${stats.totalCustomers} sites · ${stats.totalObservations} observations · <b>${stats.totalUnits}</b> units · ${stats.staleCount} stale`
   $('#band').innerHTML = `
     <div><b>${stats.totalCustomers}</b><span>sites</span></div>
@@ -126,24 +126,24 @@ async function load() {
       ? '<span class="flag">refresh</span>'
       : (c.staleDays > 180 ? '<span class="flag">stale</span>' : '<span class="flag ok">current</span>')
     const traces = c.equipment.map(e => {
-      const aging = (e.avgAge ?? 0) >= 7
+      const aging = e.oldestQuantity > 0
       const w = Math.max(4, Math.round(e.totalQuantity / maxUnits * 100))
       return `<div class="trace">
-        <span class="name">${e.modality}</span>
+        <span class="name">${escapeHtml(e.modality)}</span>
         <span class="bar"><i class="${aging ? 'warn' : ''}" style="width:${w}%"></i></span>
         <span class="meta"><b>${e.totalQuantity}</b>${e.avgAge !== undefined ? ` · ${e.avgAge.toFixed(0)}y${aging ? ' <span class="flag-dot">▲</span>' : ''}` : ' · age —'}</span>
       </div>`
     }).join('')
     return `<article class="sheet">
       <div class="sheet-head">
-        <div><h2>${c.customer.name}</h2><div class="loc">${c.customer.city}, ${c.customer.country} · ${c.observationCount} observations</div></div>
+        <div><h2>${escapeHtml(c.customer.name)}</h2><div class="loc">${escapeHtml(c.customer.city)}, ${escapeHtml(c.customer.country)} · ${c.observationCount} observations</div></div>
         ${flag}
       </div>
       <div class="traces">${traces}</div>
     </article>`
   }).join('')
 }
-load()
+load().catch(error => { $('#readout').textContent = 'Could not load dashboard: ' + error.message })
 </script>
 </body>
 </html>

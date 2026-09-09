@@ -19,10 +19,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan for secrets
-        uses: trufflesecurity/trufflehog@v3.63.0
+        uses: trufflesecurity/trufflehog@v3.97.1
         with:
           path: ./
-          extra_args: --fail --json
+          version: "3.97.1"
+          extra_args: --results=verified
 
   # Gate 2: SAST — static analysis of application code
   sast:

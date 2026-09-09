@@ -8,7 +8,7 @@ import {
   type ModelProgressUpdate,
 } from '@qvac/sdk'
 import { logEvidence } from '../evidence/logger.js'
-import { SYSTEM_PROMPT, EXTRACTION_SCHEMA } from './prompt.js'
+import { SYSTEM_PROMPT, EXTRACTION_SCHEMA, parseExtraction } from './prompt.js'
 import type { Extraction } from '../types.js'
 
 /**
@@ -71,7 +71,7 @@ export async function extractObservation(
 
   const jsonMatch = raw.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error(`Model did not return JSON: ${raw.slice(0, 200)}`)
-  return { extraction: JSON.parse(jsonMatch[0]) as Extraction, stats }
+  return { extraction: parseExtraction(JSON.parse(jsonMatch[0])), stats }
 }
 
 export async function loadExtractionModel() {
