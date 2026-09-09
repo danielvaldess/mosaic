@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3'
 import type { Extraction, Observation } from '../types.js'
 import { findOrCreateCustomer } from '../store/db.js'
 import { groundExtraction, handleObservation, normalizeModality, saveObservation, type AgentReply } from './agent.js'
+import { detectLang, type Lang, msgDraftDiscarded, msgNoPending, msgNeedLocation, msgTooLong, msgGreeting, msgNoEquipmentGuidance, msgSimpleResponseGuidance } from './i18n.js'
 
 const hasText = (value?: string) => !!value?.trim() && !/^(unknown|unspecified|not known|desconocido)$/i.test(value.trim())
 
@@ -37,30 +38,31 @@ export function mergeExtraction(previous: Extraction | undefined, next: Extracti
 function applyFollowUpAnswer(extraction: Extraction, question: string | undefined, answer: string): Extraction {
   if (!question) return extraction
   const text = question.toLowerCase()
-  const intents = [
-    text.includes('quantity') || text.includes('how many') || text.includes('cantidad'),
-    text.includes('brand') || text.includes('manufacturer') || text.includes('marca'),
-    text.includes('model') || text.includes('modelo'),
-    text.includes('age') || text.includes('old') || text.includes('edad'),
-  ]
+  // Determine which single intent this question is about (multi-language keywords).
+  // Each intent group counts as one, even if multiple keywords match.
+  const hasQuantity = /\b(quantity|how many|cantidad|quantidade|quantité|combien|anzahl|wie viele|quantità|quanti|hoeveel|aantal)\b/i.test(text)
+  const hasBrand = /\b(brand|manufacturer|marca|fabricante|marque|fabricant|marke|hersteller|produttore|merk|fabrikant)\b/i.test(text)
+  const hasModel = /\b(model|modelo|modèle|modell|modello)\b/i.test(text)
+  const hasAge = /\b(age|old|years|antigüedad|antiguedad|años|antiguidade|anos|ancienneté|ans|alter|jahre|età|anni|leeftijd|jaar|oud)\b/i.test(text)
+  const intentCount = [hasQuantity, hasBrand, hasModel, hasAge].filter(Boolean).length
   // Combined free-text questions still need the extractor to split the answer.
-  if (intents.filter(Boolean).length !== 1) return extraction
+  if (intentCount !== 1) return extraction
   const modality = normalizeModality(/\(([^)]+)\)/.exec(question)?.[1])
   const rows = extraction.equipment.filter(row => !modality || normalizeModality(row.modality) === modality)
   if (!rows.length) return extraction
   for (const row of rows) {
-    if (text.includes('quantity') || text.includes('how many') || text.includes('cantidad')) {
+    if (hasQuantity) {
       const number = Number(/\b([1-9][0-9]*)\b/.exec(answer)?.[1])
       if (Number.isSafeInteger(number) && number > 0) row.quantity = number
-    } else if (text.includes('brand') || text.includes('manufacturer') || text.includes('marca')) {
+    } else if (hasBrand) {
       row.brand = answer.trim()
-    } else if (text.includes('model') || text.includes('modelo')) {
+    } else if (hasModel) {
       row.model = answer.trim()
-    } else if (text.includes('age') || text.includes('old') || text.includes('edad')) {
+    } else if (hasAge) {
       const number = Number(/\b([0-9]{1,3})\b/.exec(answer)?.[1])
       if (Number.isSafeInteger(number)) {
         row.ageMin = number
-        row.ageMax = /\b(?:about|around|approximately|aproximadamente)\b/i.test(answer) ? number + 2 : number
+        row.ageMax = /\b(?:about|around|approximately|aproximadamente|aproximadamente|circa|ungefähr|ongeveer)\b/i.test(answer) ? number + 2 : number
         row.ageQualitative = undefined
       } else {
         row.ageQualitative = answer.trim()
@@ -75,25 +77,42 @@ export class Conversation {
   private draft?: Observation
   private extraction?: Extraction
   private duplicateWarning = false
+  private detectedLang: Lang = 'en' // Track language from first input
   constructor(private db: Database.Database, private extract: (text: string) => Promise<Extraction>,
     private observer: string, private autoSave = false, private source: Observation['source'] = 'Text') {}
 
   async turn(message: string, question?: string): Promise<AgentReply> {
+    // Detect language on first input or if explicitly set
+    if (!this.transcript || message.length > 10) {
+      this.detectedLang = detectLang(message)
+    }
+    const lang = this.detectedLang
     const command = message.trim().toLowerCase()
     if (['skip', 'cancel', '/new', 'omitir', 'cancelar'].includes(command)) {
       this.reset()
-      return { message: 'Draft discarded. Describe a new observation.', followUps: [] }
+      return { message: msgDraftDiscarded(lang), followUps: [] }
     }
     if (['confirm', 'confirmar', 'save anyway', 'guardar de todos modos'].includes(command)) {
-      if (!this.draft) return { message: 'No pending observation. Describe what you observed first.', followUps: [] }
+      if (!this.draft) return { message: msgNoPending(lang), followUps: [] }
       const force = ['save anyway', 'guardar de todos modos'].includes(command)
       const reply = saveObservation(this.db, this.draft, true, force && this.duplicateWarning)
       this.duplicateWarning = !!reply.duplicates?.length
       if (reply.saved) this.reset()
       return reply
     }
+    // Handle greetings on first message
+    if (!this.transcript && /^(hola|buenas|hi|hello|hey|olá|oi|bonjour|salut|hallo|ciao|hoi)\b/i.test(command)) {
+      return { message: msgGreeting(lang), followUps: [] }
+    }
+    // Handle simple responses that need more context
+    if (message.length < 15 && !question) {
+      const isSimpleResponse = /^(no|sí|si|yes|non|ja|nee|niet|nein|não|nao|no sé|no se|idk|don't know|no lo sé|no lo se|¿\?|\?)$/i.test(command)
+      if (isSimpleResponse && !this.draft) {
+        return { message: msgSimpleResponseGuidance(lang), followUps: [] }
+      }
+    }
     const transcript = [this.transcript, question ? `Follow-up: ${question}\nAnswer: ${message}` : message].filter(Boolean).join('\n')
-    if (transcript.length > 16000) throw new Error('Observation too long. Confirm or use /new to start again.')
+    if (transcript.length > 16000) throw new Error(msgTooLong(lang))
     const merged = mergeExtraction(this.extraction, await this.extract(transcript))
     const extraction = groundExtraction(transcript, applyFollowUpAnswer(merged, question, message))
     // Commit state only after extraction succeeds, so errors can be retried.
@@ -102,14 +121,14 @@ export class Conversation {
     this.draft = undefined
     this.duplicateWarning = false
     if (!extraction.customer?.name?.trim()) {
-      return { message: 'Which hospital, city and country? Reply here to complete this observation.', followUps: [] }
+      return { message: msgNeedLocation(lang), followUps: [] }
     }
     const customer = findOrCreateCustomer(this.db, {
       name: extraction.customer.name.trim(), city: extraction.customer.city?.trim() || 'Unknown',
       country: extraction.customer.country?.trim() || 'Unknown', site: extraction.customer.site,
     })
     const reply = handleObservation({ db: this.db, extraction, customer, observer: this.observer,
-      observedAt: new Date().toISOString(), rawInput: transcript, source: this.source, autoSave: this.autoSave })
+      observedAt: new Date().toISOString(), rawInput: transcript, source: this.source, autoSave: this.autoSave, lang })
     this.draft = reply.observation?.equipment.length ? reply.observation : undefined
     this.duplicateWarning = !!reply.duplicates?.length
     if (reply.saved) this.reset()

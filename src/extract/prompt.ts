@@ -98,6 +98,12 @@ Extract the structured facts from their message. Rules:
   The customer.name field MUST be populated when the user mentions a hospital/clinic name.
 - Modalities: normalize synonyms -> MRI/Magnetic Resonance = MR, scanner/CT scanner = CT,
   sonography/echography = Ultrasound, X-ray = X-Ray, patient monitors = Patient Monitoring.
+  Spanish: resonador magnético/resonancia magnética = MR, tomógrafo = CT, ecógrafo = Ultrasound.
+  Portuguese: ressonância magnética = MR, tomógrafo = CT, ecógrafo = Ultrasound.
+  French: IRM = MR, scanner = CT, échographe = Ultrasound.
+  German: MRT = MR, CT-Gerät = CT, Ultraschallgerät = Ultrasound.
+  Italian: risonanza magnetica = MR, tomografo = CT, ecografo = Ultrasound.
+  Dutch: MRI-systeem = MR, CT-scanner = CT, echograaf = Ultrasound.
 - Unknowns stay empty or "Unknown". NEVER invent a brand, model, age or quantity.
 - Preserve explicit counts: "two MR systems" means modality="MR", quantity=2; "one CT" means modality="CT", quantity=1.
 - MR, MRI, CT and Ultrasound are modalities, not product models. If no product model is named, omit model.

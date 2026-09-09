@@ -39,7 +39,11 @@ Sin `small`, se descarga Qwen3-4B (~2.5GB) — no lo lances por accidente en CI.
 ```
 src/extract/prompt.ts     ← prompt + JSON Schema. ÚNICA fuente del contrato LLM.
 src/extract/extractor.ts  ← loadModel + completion() con responseFormat json_schema
+src/extract/remote.ts     ← P2P remote inference via QVAC HTTP server
+src/extract/provider.ts   ← Unified inference entrypoint (local vs remote)
 src/agent/agent.ts        ← follow-ups, duplicados, estados, guardado, anti-alucinación
+src/agent/conversation.ts ← turn handling, language tracking, follow-up answer application
+src/agent/i18n.ts         ← 7-language i18n: detection, modality labels, plurals, follow-ups
 src/store/db.ts           ← SQLite (better-sqlite3); snake_case DB → camelCase TS
 src/store/seed.ts         ← carga del dataset dummy (acepta DB inyectada para tests)
 src/insights/insights.ts  ← Customer 360, stats globales, NL analytics determinista
@@ -58,6 +62,48 @@ scripts/voice-capture.mjs ← demo de transcripción WAV
 
 Flujo: texto → `extractObservation()` → `handleObservation()` (follow-ups, duplicados,
 estados) → `insertObservation()` → insights.
+
+## i18n (Multiidioma)
+
+Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
+
+### Detección de idioma (`src/agent/i18n.ts`)
+- Detección por palabras clave con pesos (no regex única)
+- Detección rápida de saludos (<20 chars): "Hola"→es, "Hello"→en, "Olá"→pt, etc.
+- Palabras compartidas entre idiomas (el/la/en/de) cuentan por ocurrencia
+- `handleObservation` recibe `lang` como parámetro para evitar re-detección desde el transcript
+
+### Etiquetas de modalidad
+- Cada modality tiene labels en 7 idiomas (MR, CT, Ultrasound, X-Ray, etc.)
+- Plurales automáticos: resonadores magnéticos, resonateurs magnétiques, MRT-Geräte, etc.
+
+### Preguntas de follow-up
+- Templates por idioma para brand, model, age, quantity, customer, location, notes
+- Cada pregunta incluye razón (ej: "Knowing the manufacturer helps track equipment lifecycle")
+
+### Detección de intents multilíngüe (`applyFollowUpAnswer`)
+- Regex multiidioma para detectar intención de la pregunta (no solo keywords en inglés)
+- Marca: brand/marca/marque/hersteller/merk, Edad: age/old/años/ans/jahre/etc.
+
+## Mejoras en la conversación
+
+### Respuestas simples
+- Saludos ("Hola", "Hello") → retorna mensaje de bienvenida en el idioma detectado
+- Respuestas cortas ("no", "sí", "no sé") sin draft activo → retorna guía
+
+### Mensajes de guía
+- Cuando no detecta equipo: "No encontré equipo médico... Intenta describir: 'Vi dos resonadores magnéticos y un tomógrafo'"
+- En 7 idiomas con ejemplos específicos
+
+### Extracción multilíngüe (`src/extract/prompt.ts`)
+- Prompt incluye sinónimos de modalidad en 7 idiomas
+- resonador magnético/resonancia magnética = MR, tomógrafo = CT, ecógrafo = Ultrasound, etc.
+
+## Normalización de clientes (`src/store/db.ts`)
+
+- `findOrCreateCustomer` normaliza acentos con `normalizeAccents()` (NFD + strip)
+- Evita duplicados: "Panama" y "Panamá" se tratan como el mismo país
+- customers son unique por (name+city+country) case-insensitive + accent-normalized
 
 ## Quirks que rompen a los agentes
 

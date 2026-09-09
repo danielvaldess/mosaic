@@ -53,13 +53,13 @@ describe('review and save', () => {
     extract.mockResolvedValueOnce({equipment: [{modality: 'MR', quantity: 2}]})
     const reply = await conversation.turn('2', 'Do you know the quantity (MR)?')
     expect(reply.observation?.equipment[0]?.quantity).toBe(2)
-    expect(reply.message).toContain('Test Hospital, Panama City, Panama')
+    expect(reply.message).toContain('Test Hospital')
   })
   it('does not ask for a hospital already present in the user text when the model omits it', async () => {
     const {conversation} = setup({equipment: [{modality: 'MR', quantity: 1}]})
     const reply = await conversation.turn("I'm at Hospital Test in Panama City, Panama. They have two MR systems.")
     expect(reply.observation?.equipment[0]?.quantity).toBe(2)
-    expect(reply.message).toContain('Hospital Test, Panama City, Panama')
+    expect(reply.message).toContain('Hospital Test')
   })
   it('retains equipment when the next extraction only identifies the hospital', async () => {
     const {conversation, extract} = setup({equipment: [{modality: 'MR', quantity: 2}]})

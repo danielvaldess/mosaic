@@ -137,10 +137,10 @@ describe('planFollowUps', () => {
         { field: 'brand', modality: 'MR', reason: 'not provided' },
         { field: 'approximate age', modality: 'MR', reason: 'not provided' },
       ],
-    })
+    }, 'en')
     expect(ups[0]!.intent).toBe('brand')
     expect(ups[1]!.intent).toBe('age')
-    expect(ups[0]!.question).toContain('Do you know the brand')
+    expect(ups[0]!.question).toContain('brand')
   })
 })
 
