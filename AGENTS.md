@@ -85,11 +85,18 @@ estados) → `insertObservation()` → insights.
 ## Env vars
 
 - `FIELDSIGHT_EXTRACT_MODEL=small` — Qwen3-0.6B en vez del 4B por defecto
+- `FIELDSIGHT_LLM_URL=http://<ip>:11437/v1` — **delega** la inferencia a un peer con GPU
+  (`qvac serve --openai`, ver `docs/GUIDE_GPU_SERVER.md`). Debe terminar en `/v1`.
+- `FIELDSIGHT_LLM_MODEL` — alias del modelo en el server remoto (default `fieldsight-llm`)
+- `FIELDSIGHT_LLM_API_KEY` — clave Bearer requerida cuando el peer se expone a la LAN
 - `FIELDSIGHT_AUTOSAVE=1` — guarda sin confirmación
 - `FIELDSIGHT_OBSERVER` — identidad del observador (default "Field User 01")
 - `PORT` — puerto del servidor (default: 4173 server, 4174 web)
 - `QVAC_CPU_ONLY=1` — forzar inferencia CPU sin Vulkan
 - `.env.example` documenta; nunca committear `.env`
+
+**Regla**: local y remoto devuelven el mismo `Extraction` vía `src/extract/provider.ts`
+(`createInference()`), así `Conversation` no sabe ni le importa el backend.
 
 ## Modelo de datos
 

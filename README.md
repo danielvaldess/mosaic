@@ -69,6 +69,28 @@ node scripts/voice-capture.mjs nota.wav   # genera nota.txt con Whisper local
 # luego pega el texto en el CLI, o usa /voice si lo implementas
 ```
 
+### Inferencia delegada (P2P / GPU remota)
+
+Sin GPU local, FieldSight puede delegar la inferencia a la máquina de un
+compañero con GPU (RTX 3050, etc.) que corra el servidor QVAC. El lado servidor
+se lanza con `qvac serve --openai --no-default -c config/qvac.serve.json
+-H <IP> -p 11437 --api-key <key>` — ver `docs/GUIDE_GPU_SERVER.md` para la guía
+paso a paso (usa `-c`, no `QVAC_CONFIG_PATH`).
+
+Lado cliente (tu máquina sin GPU):
+
+```bash
+FIELDSIGHT_LLM_URL=http://<peer-ip>:11437/v1 \
+FIELDSIGHT_LLM_MODEL=fieldsight-llm \
+FIELDSIGHT_LLM_API_KEY=<key> \
+npm run cli
+```
+
+`FIELDSIGHT_LLM_API_KEY` es la misma clave Bearer que definió el peer con
+`--api-key`; es obligatoria cuando el peer expone el server a la LAN.
+Los datos viajan solo entre los equipos del equipo — sin nube. Cumple el
+requisito de "inferencia delegada peer-to-peer" del reto.
+
 ## Modelos (registry QVAC)
 
 | Uso | Modelo | Tamaño |

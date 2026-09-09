@@ -1,17 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { openDb } from './store/db.js'
-import { extractObservation, loadExtractionModel, unloadExtractionModel } from './extract/extractor.js'
+import { createInference } from './extract/provider.js'
 import { initEvidence, exportEvidenceCsv } from './evidence/logger.js'
 import { createApp } from './http-app.js'
 
 async function main() {
   initEvidence()
   const db = openDb()
-  let modelId: string
-  try { modelId = await loadExtractionModel() }
-  catch (error) { db.close(); throw error }
+  const inference = await createInference()
   const server = createApp({
-    db, extract: async text => (await extractObservation(text, modelId)).extraction,
+    db, extract: inference.extract,
     chatHtml: readFileSync(new URL('./web/chat.html', import.meta.url), 'utf8'),
     dashboardHtml: readFileSync(new URL('./server/index.html', import.meta.url), 'utf8'),
     evidence: exportEvidenceCsv, autoSave: process.env.FIELDSIGHT_AUTOSAVE === '1',
@@ -21,7 +19,7 @@ async function main() {
     if (stopping) return
     stopping = true
     server.close(() => {
-      void unloadExtractionModel(modelId).catch(console.error).finally(() => db.close())
+      void inference.dispose().catch(console.error).finally(() => db.close())
     })
   }
   process.once('SIGINT', shutdown)
