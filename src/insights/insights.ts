@@ -2,6 +2,7 @@ import Database from 'better-sqlite3'
 import {
   allCustomers,
   allObservations,
+  observationsForCustomer,
   equipmentForCustomer,
 } from '../store/db.js'
 import type { Customer, EquipmentObservation } from '../types.js'
@@ -39,7 +40,7 @@ const STALE_DAYS = 180
 
 export function customer360(db: Database.Database, customer: Customer): Customer360 {
   const eq = equipmentForCustomer(db, customer.id)
-  const obs = allObservations(db).filter((o) => o.customerId === customer.id)
+  const obs = observationsForCustomer(db, customer.id)
 
   const byModality = new Map<string, EquipmentObservation[]>()
   for (const e of eq) {
@@ -96,15 +97,15 @@ export function globalStats(db: Database.Database): GlobalStats {
   const byModality: Record<string, number> = {}
   const byCountry: Record<string, number> = {}
   let totalUnits = 0
-  for (const c of customers) {
+  const all = customers.map((c) => customer360(db, c))
+  for (const c360 of all) {
+    const c = c360.customer
     byCountry[c.country] = (byCountry[c.country] ?? 0) + 1
-    const c360 = customer360(db, c)
     totalUnits += c360.totalUnits
     for (const e of c360.equipment) {
       byModality[e.modality] = (byModality[e.modality] ?? 0) + e.totalQuantity
     }
   }
-  const all = customers.map((c) => customer360(db, c))
   const refreshCandidates = all.filter((c) => c.refreshOpportunity)
   const staleCount = all.filter((c) => c.staleDays !== undefined && c.staleDays > STALE_DAYS).length
 

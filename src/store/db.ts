@@ -72,13 +72,13 @@ export function findOrCreateCustomer(
 ): Customer {
   const existing = db
     .prepare('SELECT * FROM customers WHERE lower(name)=lower(?) AND lower(city)=lower(?) AND lower(country)=lower(?)')
-    .get(input.name, input.city, input.country) as Customer | undefined
+    .get(input.name, input.city, input.country) as Record<string, unknown> | undefined
   if (existing) {
     if (input.site && !existing.site) {
       db.prepare('UPDATE customers SET site=? WHERE id=?').run(input.site, existing.id)
-      return { ...existing, site: input.site }
+      return { ...mapCustomer(existing), site: input.site }
     }
-    return existing
+    return mapCustomer(existing)
   }
   const row: Customer = {
     id: crypto.randomUUID(),
@@ -187,8 +187,8 @@ function mapEquipment(r: Record<string, unknown>): EquipmentObservation {
   const age =
     r.age_min !== null || r.age_max !== null || r.age_qualitative !== null
       ? {
-          min: r.age_min as number | undefined,
-          max: r.age_max as number | undefined,
+          min: (r.age_min as number | null) ?? undefined,
+          max: (r.age_max as number | null) ?? undefined,
           qualitative: (r.age_qualitative as string | null) ?? undefined,
           installationYear: (r.installation_year as number | null) ?? undefined,
         }

@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3'
@@ -103,6 +104,6 @@ export function seedFromXlsx(db?: Database.Database): number {
   return rows.length
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   seedFromXlsx()
 }

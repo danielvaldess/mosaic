@@ -1,8 +1,7 @@
 import Database from 'better-sqlite3'
 import {
-  allObservations,
+  observationsForCustomer,
   equipmentForObservation,
-  findOrCreateCustomer,
   insertObservation,
 } from '../store/db.js'
 import type {
@@ -49,6 +48,11 @@ const MODALITY_SYNONYMS: Record<string, string> = {
   'x-ray': 'X-Ray',
   'patient monitor': 'Patient Monitoring',
   monitoring: 'Patient Monitoring',
+  'patient monitoring': 'Patient Monitoring',
+  'image guided therapy': 'Image Guided Therapy',
+  resonancia: 'MR',
+  tomografia: 'CT',
+  ecografo: 'Ultrasound',
 }
 
 export function normalizeModality(raw?: string): string | undefined {
@@ -62,16 +66,13 @@ export function normalizeModality(raw?: string): string | undefined {
   }
   // Fuzzy containment: pick the first known modality present in the string.
   for (const [alias, canonical] of Object.entries(MODALITY_SYNONYMS)) {
-    if (key.includes(alias)) return canonical
+    if (mentions(key, alias)) return canonical
   }
   return undefined
 }
 
-/** All aliases that resolve to a given canonical modality. */
-function aliasesFor(canonical: string): string[] {
-  return Object.entries(MODALITY_SYNONYMS)
-    .filter(([, c]) => c === canonical)
-    .map(([alias]) => alias)
+function mentions(text: string, alias: string): boolean {
+  return new RegExp('(^|[^a-z0-9])' + alias + '($|[^a-z0-9])', 'i').test(text)
 }
 
 /**
@@ -84,16 +85,89 @@ export function filterModalitiesMentioned(rawInput: string, extraction: Extracti
   const q = rawInput.toLowerCase()
   const mentioned = new Set<string>()
   for (const [alias, canonical] of Object.entries(MODALITY_SYNONYMS)) {
-    if (q.includes(alias)) mentioned.add(canonical)
+    if (mentions(q, alias)) mentioned.add(canonical)
   }
   const kept = extraction.equipment.filter((e) => {
     const canonical = normalizeModality(e.modality)
     if (!canonical) return false
     // Trust explicitly-named modalities even without exact synonym match, and
     // keep rows whose modality is directly present in the input.
-    return mentioned.has(canonical) || q.includes(canonical.toLowerCase())
+    return mentioned.has(canonical) || mentions(q, canonical.toLowerCase())
   })
   return { ...extraction, equipment: kept }
+}
+
+const COUNT_WORDS: Record<string, number> = {
+  a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5,
+  six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5,
+  seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+}
+const COUNT_TOKEN = `(?:[1-9][0-9]*|${Object.keys(COUNT_WORDS).join('|')})`
+const isUnknown = (value?: string) => !value?.trim() || /^(unknown|unspecified|not known|desconocido)$/i.test(value.trim())
+
+function groundCustomer(rawInput: string, extracted: Extraction['customer']): Extraction['customer'] {
+  const candidates: Array<{ name: string; city: string; country: string }> = []
+  const prosePatterns = [
+    /\b(?:i['’]?m|i am)\s+at\s+(.{2,80}?)\s+in\s+([^,.\n]{2,60}),\s*([^.?!\n]{2,60}?)(?=[.?!\n]|$)/gi,
+    /\b(?:estoy|me encuentro)\s+en\s+(.{2,80}?)\s+en\s+([^,.\n]{2,60}),\s*([^.?!\n]{2,60}?)(?=[.?!\n]|$)/gi,
+  ]
+  for (const pattern of prosePatterns) {
+    for (const match of rawInput.matchAll(pattern)) {
+      candidates.push({ name: match[1]!.trim(), city: match[2]!.trim(), country: match[3]!.trim() })
+    }
+  }
+  for (const line of rawInput.split('\n')) {
+    const answer = line.replace(/^Answer:\s*/i, '').trim()
+    const comma = /^((?:hospital|clinic|cl[ií]nica)\b[^,.]{0,80}),\s*([^,.]{2,60}),\s*([^,.]{2,60})[.!]?$/i.exec(answer)
+    const located = /^((?:hospital|clinic|cl[ií]nica)\b.{0,80}?)\s+(?:in|en)\s+([^,.]{2,60}),\s*([^,.]{2,60})[.!]?$/i.exec(answer)
+    const match = comma ?? located
+    if (match) candidates.push({ name: match[1]!.trim(), city: match[2]!.trim(), country: match[3]!.trim() })
+  }
+  const grounded = candidates.at(-1)
+  return grounded ? { ...extracted, ...grounded } : extracted
+}
+
+/** Correct only explicit, unambiguous counts; a modality total must not be applied to each model row. */
+export function groundExtraction(rawInput: string, extraction: Extraction): Extraction {
+  const userText = rawInput.split('\n').filter(line => !line.startsWith('Follow-up:')).join('\n').toLowerCase()
+  const filtered = filterModalitiesMentioned(userText, extraction)
+  const customer = groundCustomer(rawInput, filtered.customer)
+  const equipment = filtered.equipment.map(row => {
+    const e = { ...row }
+    const canonical = normalizeModality(e.modality)
+    // A modality describes the kind of equipment, not its product model.
+    if (e.model && MODALITY_SYNONYMS[e.model.trim().toLowerCase()]) e.model = undefined
+    if (canonical && filtered.equipment.filter(other => normalizeModality(other.modality) === canonical).length === 1) {
+      const aliases = Object.entries(MODALITY_SYNONYMS).filter(([, mod]) => mod === canonical).map(([alias]) => alias).sort((a, b) => b.length - a.length)
+      const pattern = new RegExp(`\\b(${COUNT_TOKEN})\\s+(?:${aliases.join('|')})\\b`, 'gi')
+      const counts: number[] = []
+      let ambiguous = false
+      for (const match of userText.matchAll(pattern)) {
+        const prefix = userText.slice(0, match.index)
+        if (/(?:not|no|at least|at most|between|or|over|under|about|around|approximately|up to|to|al menos|hasta|entre|o|model|modelo)\s*$/.test(prefix)
+          || /[0-9][.,/-]$/.test(prefix)
+          || /\b(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred(?: and)?|thousand|veinte|treinta|cuarenta|cincuenta|cien|ciento|mil)[ -]+$/.test(prefix)) { ambiguous = true; continue }
+        const token = match[1]!.toLowerCase()
+        counts.push(COUNT_WORDS[token] ?? Number(token))
+      }
+      // A later answer to a quantity question supersedes the original count.
+      const quantityAnswers = [...rawInput.matchAll(new RegExp(`Follow-up: [^\\n]*(?:quantity|how many|cantidad)[^\\n]*\\(${canonical}\\)[^\\n]*\\nAnswer: ([^\\n]*)`, 'gi'))]
+      const quantityAnswer = quantityAnswers.at(-1)
+      const laterInput = quantityAnswer ? rawInput.slice(quantityAnswer.index! + quantityAnswer[0].length) : ''
+      if (quantityAnswer && !pattern.test(laterInput) && !/\n(?:Answer: )?(?:actually|correction|instead|en realidad|correccion)\b/i.test(laterInput)) {
+        const simpleAnswer = new RegExp(`^(${COUNT_TOKEN})(?:[ \\t]*(?:systems?|units?|equipos?))?[.!]?[ \\t]*$`, 'i').exec(quantityAnswer[1]!.trim())
+        if (simpleAnswer) {
+          const token = simpleAnswer[1]!.toLowerCase()
+          e.quantity = COUNT_WORDS[token] ?? Number(token)
+        }
+      } else if (!quantityAnswer && !ambiguous && counts.length === 1 && !/\n(?:Answer: )?(?:actually|correction|instead|en realidad|correccion)\b/i.test(rawInput)) {
+        e.quantity = counts[0]
+      }
+    }
+    return e
+  })
+  return { ...filtered, customer, equipment }
 }
 
 /**
@@ -119,6 +193,9 @@ export function buildObservation(params: {
       const modality = normalizeModality(e.modality)
       // Drop hallucinated/unrecognized modalities instead of persisting garbage.
       if (!modality) return null
+      if (e.quantity === undefined || !Number.isSafeInteger(e.quantity) || e.quantity < 1) {
+        throw new Error(`Quantity required for ${modality}`)
+      }
       const certainty = e.certainty ?? 'Medium'
       const ageKnown = e.ageMin !== undefined || e.ageMax !== undefined || !!e.ageQualitative
       let status: Status = 'Reported'
@@ -129,7 +206,7 @@ export function buildObservation(params: {
         observationId: obsId,
         customerId: customer.id,
         modality: modality as EquipmentObservation['modality'],
-        quantity: e.quantity ?? 1,
+        quantity: e.quantity,
         brand: (e.brand ?? 'Unknown') as EquipmentObservation['brand'],
         model: (e.model ?? 'Unknown') as EquipmentObservation['model'],
         age: e.ageMin !== undefined || e.ageMax !== undefined || e.ageQualitative
@@ -182,7 +259,7 @@ export function detectDuplicates(
   db: Database.Database,
   observation: Observation,
 ): DuplicateHit[] {
-  const existing = allObservations(db).filter((o) => o.id !== observation.id)
+  const existing = observationsForCustomer(db, observation.customerId).filter((o) => o.id !== observation.id)
   const hits: DuplicateHit[] = []
   for (const ex of existing) {
     const exEquipment = equipmentForObservation(db, ex.id)
@@ -193,11 +270,11 @@ export function detectDuplicates(
 
         let score = 0.5
         const reasons: string[] = []
-        if (exEq.brand && newEq.brand && exEq.brand === newEq.brand) {
+        if (exEq.brand && exEq.brand !== 'Unknown' && newEq.brand && exEq.brand === newEq.brand) {
           score += 0.25
           reasons.push('same brand')
         }
-        if (exEq.model && newEq.model && exEq.model === newEq.model) {
+        if (exEq.model && exEq.model !== 'Unknown' && newEq.model && exEq.model === newEq.model) {
           score += 0.15
           reasons.push('same model')
         }
@@ -236,7 +313,14 @@ export function planFollowUps(
   max = 3,
 ): FollowUp[] {
   const ups: FollowUp[] = []
-  const missing = extraction.missingFields ?? []
+  const missing = [...(extraction.missingFields ?? [])]
+  for (const e of extraction.equipment) {
+    if (e.quantity === undefined) missing.unshift({field: 'quantity', modality: e.modality})
+    if (isUnknown(e.brand)) missing.push({field: 'brand', modality: e.modality})
+    if (isUnknown(e.model)) missing.push({field: 'model', modality: e.modality})
+    if (e.ageMin === undefined && e.ageMax === undefined && isUnknown(e.ageQualitative)) missing.push({field: 'age', modality: e.modality})
+  }
+  const seen = new Set<string>()
   for (const mf of missing) {
     if (ups.length >= max) break
     const mod = mf.modality ? ` (${normalizeModality(mf.modality) ?? mf.modality})` : ''
@@ -248,6 +332,20 @@ export function planFollowUps(
     else if (field.includes('quant')) intent = 'quantity'
     else if (field.includes('customer') || field.includes('hospital')) intent = 'customer'
     else if (field.includes('city') || field.includes('country')) intent = 'location'
+    const modality = normalizeModality(mf.modality)
+    const rows = extraction.equipment.filter(e => !modality || normalizeModality(e.modality) === modality)
+    if (field.includes('modality')) continue
+    if (intent === 'customer' && isUnknown(extraction.customer?.name)) continue
+    if (intent === 'location' && !isUnknown(extraction.customer?.city) && !isUnknown(extraction.customer?.country)) continue
+    if (rows.length && ['quantity', 'brand', 'model', 'age'].includes(intent)) {
+      const stillMissing = rows.some(e => intent === 'quantity' ? e.quantity === undefined
+        : intent === 'brand' ? isUnknown(e.brand) : intent === 'model' ? isUnknown(e.model)
+        : e.ageMin === undefined && e.ageMax === undefined && isUnknown(e.ageQualitative))
+      if (!stillMissing) continue
+    }
+    const key = `${modality ?? ''}:${intent}`
+    if (seen.has(key)) continue
+    seen.add(key)
     ups.push({
       question: `Do you know the ${mf.field}${mod}? ${mf.reason ? `(${mf.reason})` : ''}`,
       intent,
@@ -259,7 +357,7 @@ export function planFollowUps(
 
 /**
  * Core agent turn: given the raw NL input, returns what to tell the user and
- * what to save. Saves immediately if all required fields present, else asks.
+ * what to review. Saving requires confirmation unless autosave is enabled.
  */
 export function handleObservation(params: {
   db: Database.Database
@@ -273,7 +371,10 @@ export function handleObservation(params: {
 }): AgentReply {
   const { db, extraction: rawExtraction, customer, observer, observedAt, rawInput, source } = params
   // Anti-hallucination: keep only equipment the user actually mentioned.
-  const extraction = filterModalitiesMentioned(rawInput, rawExtraction)
+  const extraction = groundExtraction(rawInput, rawExtraction)
+  if (extraction.equipment.some(e => e.quantity === undefined)) {
+    return { message: 'How many units did you observe? Please provide the quantity before saving.', followUps: planFollowUps(extraction) }
+  }
   const observation = buildObservation({
     extraction,
     customer,
@@ -287,7 +388,7 @@ export function handleObservation(params: {
   const missingRequired = extraction.equipment.length === 0
   const hasModality = extraction.equipment.some((e) => e.modality)
 
-  if (missingRequired || !hasModality || (followUps.length > 0 && !params.autoSave)) {
+  if (missingRequired || !hasModality || !params.autoSave) {
     let message = ''
     if (missingRequired) {
       message = 'I could not identify any medical equipment in that message. Which modality did you observe?'
@@ -307,27 +408,26 @@ export function handleObservation(params: {
     return { message, followUps, observation }
   }
 
-  const duplicates = detectDuplicates(db, observation)
-  if (duplicates.length > 0) {
-    const dupMsg = duplicates
-      .map((d) => `${d.modality} @ ${customer.name} (${Math.round(d.score * 100)}% match: ${d.reason})`)
-      .join('; ')
-    return {
-      message: `⚠ Possible duplicates detected: ${dupMsg}. Reply "save anyway" to store as a new observation, or "skip".`,
-      followUps: [],
-      observation,
-      duplicates,
-    }
-  }
+  return saveObservation(db, observation, false)
+}
 
-  insertObservation(db, observation)
-  const summary = observation.equipment
-    .map((e) => `${e.quantity}× ${e.modality}${e.brand !== 'Unknown' ? ` (${e.brand})` : ''}`)
-    .join(', ')
-  return {
-    message: `✓ Saved ${observation.status} observation: ${summary} at ${customer.name}.`,
-    observation,
-    saved: true,
-    followUps: [],
+/** Save the reviewed draft without another inference or rebuilt observation. */
+export function saveObservation(db: Database.Database, draft: Observation, confirmed: boolean, allowDuplicate = false): AgentReply {
+  if (!draft.equipment.length) throw new Error('No equipment to save')
+  if (db.prepare('SELECT id FROM observations WHERE id=?').get(draft.id)) {
+    return { message: 'This observation is already saved.', saved: true, observation: draft, followUps: [] }
   }
+  const duplicates = detectDuplicates(db, draft)
+  if (duplicates.length && !allowDuplicate) {
+    return { message: 'Possible duplicates found. Reply "save anyway" to add a new observation, or "skip".', observation: draft, duplicates, followUps: [] }
+  }
+  const observation = structuredClone(draft)
+  if (confirmed) {
+    observation.reviewConfirmed = true
+    // Confirmation validates the report, not the precision of estimated ages.
+    observation.equipment = observation.equipment.map(e => ({ ...e, status: e.status === 'Estimated' ? 'Estimated' : 'Confirmed' }))
+    observation.status = observation.equipment.some(e => e.status === 'Estimated') ? 'Estimated' : 'Confirmed'
+  }
+  insertObservation(db, observation)
+  return { message: 'Saved observation (' + observation.status + ').', observation, saved: true, followUps: [] }
 }

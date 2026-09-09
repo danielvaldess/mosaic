@@ -98,7 +98,7 @@ export interface Extraction {
   missingFields?: Array<{
     field: string
     modality?: string
-    reason: string
+    reason?: string
   }>
 }
 

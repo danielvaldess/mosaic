@@ -105,6 +105,42 @@ Exporta en cualquier momento con `/evidence` dentro del CLI.
 
 ## Roadmap / stretch goals
 
+### Conversación y revisión
+
+La terminal y el chat web comparten el mismo borrador. Describe los equipos y responde
+con los detalles adicionales; cada respuesta se incorpora al contexto de la observación.
+Escribe `confirm` (o `confirmar`) para guardar lo revisado, `skip` para descartarlo o
+`/new` para empezar otra observación. Si se detecta un duplicado, revisa la advertencia
+y usa `save anyway` para guardarlo como una observación nueva.
+
+La confirmación no vuelve a ejecutar la IA. `reviewConfirmed` indica que el usuario
+revisó el registro; los equipos con edades estimadas conservan el estado `Estimated`.
+`FIELDSIGHT_AUTOSAVE=1` permite guardar sin revisión, pero no evita la advertencia de duplicados.
+
+`npm run web` sirve el chat en `http://localhost:4174` y el panel en
+`http://localhost:4174/dashboard`. Los servidores escuchan solo en la máquina local.
+Los borradores web caducan después de una hora de inactividad y no sobreviven a un
+reinicio del servidor ni a la recarga de la página. Las observaciones guardadas sí permanecen en SQLite.
+
+### Windows (PowerShell)
+
+Si `npm ci` intenta compilar `better-sqlite3` con node-gyp, la versión fijada incluye
+binarios precompilados. Para instalar y comprobar la lógica sin ejecutar scripts de instalación:
+
+```powershell
+npm ci --ignore-scripts
+npm run typecheck
+npm test
+npm run seed
+$env:FIELDSIGHT_EXTRACT_MODEL = "small"
+npm run web
+```
+
+Las pruebas usan SQLite real y un extractor simulado: no descargan modelos ni prueban
+la inferencia QVAC. El primer arranque con IA puede descargar el modelo seleccionado.
+
+## Pendientes
+
 - [x] Captura por texto conversacional
 - [x] Extracción estructurada (JSON Schema)
 - [x] Follow-ups automáticos + confirmación
