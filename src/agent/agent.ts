@@ -13,6 +13,25 @@ import type {
   Observation,
   Status,
 } from '../types.js'
+import {
+  type Lang,
+  detectLang,
+  buildFollowUpQuestion,
+  buildFollowUpReason,
+  msgIdentifiedEquipment,
+  msgFollowUpIntro,
+  msgReadyToSave,
+  msgNoEquipment,
+  msgNoEquipmentGuidance,
+  msgNeedLocation,
+  msgNeedQuantity,
+  msgSaved,
+  msgAlreadySaved,
+  msgDuplicateWarning,
+  buildEquipmentSummary,
+  buildCustomerLocation,
+  modalityLabelPlural,
+} from './i18n.js'
 
 export interface AgentReply {
   message: string
@@ -307,9 +326,10 @@ export function detectDuplicates(
   return hits
 }
 
-/** Builds the follow-up questions for the most valuable missing data. */
+/** Builds natural follow-up questions for the most valuable missing data. */
 export function planFollowUps(
   extraction: Extraction,
+  lang: Lang = 'en',
   max = 3,
 ): FollowUp[] {
   const ups: FollowUp[] = []
@@ -323,7 +343,6 @@ export function planFollowUps(
   const seen = new Set<string>()
   for (const mf of missing) {
     if (ups.length >= max) break
-    const mod = mf.modality ? ` (${normalizeModality(mf.modality) ?? mf.modality})` : ''
     const field = mf.field.toLowerCase()
     let intent: FollowUp['intent'] = 'notes'
     if (field.includes('brand') || field.includes('manufacturer')) intent = 'brand'
@@ -346,8 +365,10 @@ export function planFollowUps(
     const key = `${modality ?? ''}:${intent}`
     if (seen.has(key)) continue
     seen.add(key)
+    const question = buildFollowUpQuestion(intent, mf.modality, lang)
+    const reason = buildFollowUpReason(intent, lang)
     ups.push({
-      question: `Do you know the ${mf.field}${mod}? ${mf.reason ? `(${mf.reason})` : ''}`,
+      question: reason ? `${question} (${reason})` : question,
       intent,
       modality: mf.modality,
     })
@@ -358,6 +379,7 @@ export function planFollowUps(
 /**
  * Core agent turn: given the raw NL input, returns what to tell the user and
  * what to review. Saving requires confirmation unless autosave is enabled.
+ * Language is auto-detected from the user's input.
  */
 export function handleObservation(params: {
   db: Database.Database
@@ -368,12 +390,17 @@ export function handleObservation(params: {
   rawInput: string
   source: Observation['source']
   autoSave?: boolean
+  lang?: Lang
 }): AgentReply {
   const { db, extraction: rawExtraction, customer, observer, observedAt, rawInput, source } = params
+  const lang = params.lang ?? detectLang(rawInput)
   // Anti-hallucination: keep only equipment the user actually mentioned.
   const extraction = groundExtraction(rawInput, rawExtraction)
   if (extraction.equipment.some(e => e.quantity === undefined)) {
-    return { message: 'How many units did you observe? Please provide the quantity before saving.', followUps: planFollowUps(extraction) }
+    const modLabel = extraction.equipment[0]?.modality
+      ? modalityLabelPlural(extraction.equipment[0].modality, 2, lang)
+      : lang === 'es' ? 'equipos' : 'units'
+    return { message: msgNeedQuantity(modLabel, lang), followUps: planFollowUps(extraction, lang) }
   }
   const observation = buildObservation({
     extraction,
@@ -384,26 +411,25 @@ export function handleObservation(params: {
     source,
   })
 
-  const followUps = planFollowUps(extraction)
+  const followUps = planFollowUps(extraction, lang)
   const missingRequired = extraction.equipment.length === 0
   const hasModality = extraction.equipment.some((e) => e.modality)
 
   if (missingRequired || !hasModality || !params.autoSave) {
     let message = ''
     if (missingRequired) {
-      message = 'I could not identify any medical equipment in that message. Which modality did you observe?'
+      message = msgNoEquipmentGuidance(lang)
     } else if (!params.autoSave) {
-      const summary = observation.equipment
-        .map((e) => `${e.quantity}× ${e.modality}`)
-        .join(', ')
-      message = `Got it: ${summary} at ${customer.name}, ${customer.city}, ${customer.country}.`
+      const summary = buildEquipmentSummary(observation.equipment, lang)
+      const location = buildCustomerLocation(customer.name, customer.city, customer.country, lang)
+      message = msgIdentifiedEquipment(summary, location, lang)
       if (followUps.length) {
-        message += ` I have a few questions to make this observation more valuable:`
+        message += ' ' + msgFollowUpIntro(lang)
       } else {
-        message += ` Ready to save. Reply "confirm" to store it, or tell me more.`
+        message += ' ' + msgReadyToSave(lang)
       }
     } else {
-      message = `Saved (${observation.status}) at ${customer.name}.`
+      message = msgSaved(observation.status, lang)
     }
     return { message, followUps, observation }
   }
@@ -413,13 +439,14 @@ export function handleObservation(params: {
 
 /** Save the reviewed draft without another inference or rebuilt observation. */
 export function saveObservation(db: Database.Database, draft: Observation, confirmed: boolean, allowDuplicate = false): AgentReply {
+  const lang = detectLang(draft.rawInput)
   if (!draft.equipment.length) throw new Error('No equipment to save')
   if (db.prepare('SELECT id FROM observations WHERE id=?').get(draft.id)) {
-    return { message: 'This observation is already saved.', saved: true, observation: draft, followUps: [] }
+    return { message: msgAlreadySaved(lang), saved: true, observation: draft, followUps: [] }
   }
   const duplicates = detectDuplicates(db, draft)
   if (duplicates.length && !allowDuplicate) {
-    return { message: 'Possible duplicates found. Reply "save anyway" to add a new observation, or "skip".', observation: draft, duplicates, followUps: [] }
+    return { message: msgDuplicateWarning(lang), observation: draft, duplicates, followUps: [] }
   }
   const observation = structuredClone(draft)
   if (confirmed) {
@@ -429,5 +456,5 @@ export function saveObservation(db: Database.Database, draft: Observation, confi
     observation.status = observation.equipment.some(e => e.status === 'Estimated') ? 'Estimated' : 'Confirmed'
   }
   insertObservation(db, observation)
-  return { message: 'Saved observation (' + observation.status + ').', observation, saved: true, followUps: [] }
+  return { message: msgSaved(observation.status, lang), observation, saved: true, followUps: [] }
 }

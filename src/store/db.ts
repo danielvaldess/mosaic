@@ -66,6 +66,11 @@ export function openDb(dbPath: string = DB_PATH): Database.Database {
   return db
 }
 
+/** Normalize accented characters for comparison (e.g., "Panamá" → "Panama") */
+function normalizeAccents(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function findOrCreateCustomer(
   db: Database.Database,
   input: { name: string; city: string; country: string; site?: string },
@@ -79,6 +84,20 @@ export function findOrCreateCustomer(
       return { ...mapCustomer(existing), site: input.site }
     }
     return mapCustomer(existing)
+  }
+  // Try again with accent-normalized comparison to avoid duplicates like "Panama" vs "Panamá"
+  const normalizedName = normalizeAccents(input.name)
+  const normalizedCity = normalizeAccents(input.city)
+  const normalizedCountry = normalizeAccents(input.country)
+  const existingNormalized = db
+    .prepare('SELECT * FROM customers WHERE lower(name)=lower(?) AND lower(city)=lower(?) AND lower(country)=lower(?)')
+    .get(normalizedName, normalizedCity, normalizedCountry) as Record<string, unknown> | undefined
+  if (existingNormalized) {
+    if (input.site && !existingNormalized.site) {
+      db.prepare('UPDATE customers SET site=? WHERE id=?').run(input.site, existingNormalized.id)
+      return { ...mapCustomer(existingNormalized), site: input.site }
+    }
+    return mapCustomer(existingNormalized)
   }
   const row: Customer = {
     id: crypto.randomUUID(),

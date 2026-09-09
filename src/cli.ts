@@ -3,7 +3,7 @@ import readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import Database from 'better-sqlite3'
 import { openDb, allCustomers } from './store/db.js'
-import { extractObservation, loadExtractionModel, unloadExtractionModel } from './extract/extractor.js'
+import { createInference } from './extract/provider.js'
 import { Conversation } from './agent/conversation.js'
 import { customer360, globalStats, queryInstalledBase } from './insights/insights.js'
 import { initEvidence, exportEvidenceCsv } from './evidence/logger.js'
@@ -102,9 +102,8 @@ async function handleCommand(line: string, db: Database.Database): Promise<boole
 export async function runCli(opts: CliOptions): Promise<void> {
   initEvidence()
   const db = openDb()
-  let modelId: string
-  try { modelId = await loadExtractionModel() } catch (error) { db.close(); throw error }
-  const conversation = new Conversation(db, async text => (await extractObservation(text, modelId)).extraction, opts.observer, opts.autoSave, opts.source)
+  const inference = await createInference()
+  const conversation = new Conversation(db, inference.extract, opts.observer, opts.autoSave, opts.source)
 
   console.log('\n═══════════════════════════════════════════════')
   console.log('  FieldSight — Customer Installed Base Intelligence')
@@ -113,9 +112,11 @@ export async function runCli(opts: CliOptions): Promise<void> {
   console.log('Describe what you observed at the customer site, or type /help.\n')
 
   const rl = readline.createInterface({ input, output })
+  let closed = false
+  rl.on('close', () => { closed = true })
 
   try {
-    while (true) {
+    while (!closed) {
       const line = (await rl.question('🩺 you> ')).trim()
       if (!line) continue
       if (line.startsWith('/') && line !== '/new') {
@@ -134,7 +135,7 @@ export async function runCli(opts: CliOptions): Promise<void> {
       }
     }
   } finally {
-    try { await unloadExtractionModel(modelId) } finally { rl.close(); db.close() }
+    try { await inference.dispose() } finally { rl.close(); db.close() }
   }
 }
 
