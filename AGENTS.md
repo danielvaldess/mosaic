@@ -42,17 +42,17 @@ src/extract/extractor.ts  ← loadModel + completion() con responseFormat json_s
 src/extract/remote.ts     ← P2P remote inference via QVAC HTTP server
 src/extract/provider.ts   ← Unified inference entrypoint (local vs remote)
 src/agent/agent.ts        ← follow-ups, duplicados, estados, guardado, anti-alucinación
-src/agent/conversation.ts ← turn handling, language tracking, follow-up answer application
+src/agent/conversation.ts ← turn handling, language locking, follow-up answer application
 src/agent/i18n.ts         ← 7-language i18n: detection, modality labels, plurals, follow-ups
-src/store/db.ts           ← SQLite (better-sqlite3); snake_case DB → camelCase TS
+src/store/db.ts           ← SQLite (better-sqlite3); snake_case DB → camelCase TS; getChatSuggestions()
 src/store/seed.ts         ← carga del dataset dummy (acepta DB inyectada para tests)
 src/insights/insights.ts  ← Customer 360, stats globales, NL analytics determinista
 src/evidence/logger.ts    ← log auditable (evidence/evidence.jsonl) + export CSV
 src/voice/transcribe.ts   ← STT Whisper on-device
 src/types.ts              ← tipos, MODALITIES, BRANDS, STATUSES, CONFIDENCES
 src/cli.ts                ← asistente por terminal (entry point principal)
-src/web-server.ts         ← servidor web con chat IA (API /api/chat, /api/followup)
-src/web/chat.html         ← interfaz de chat para navegador
+src/web-server.ts         ← servidor web con chat IA (API /api/chat, /api/followup, /api/suggestions)
+src/web/chat.html         ← interfaz de chat: language selector + suggestion chips
 src/server.ts             ← dashboard solo-lectura (sin IA)
 src/server/index.html     ← HTML del dashboard
 scripts/smoke-extract.ts  ← smoke test con modelo real
@@ -63,9 +63,23 @@ scripts/voice-capture.mjs ← demo de transcripción WAV
 Flujo: texto → `extractObservation()` → `handleObservation()` (follow-ups, duplicados,
 estados) → `insertObservation()` → insights.
 
+### Suggestion Chips (chat web)
+- El input de texto se oculta cuando hay chips de sugerencias disponibles
+- Chips se cargan desde `/api/suggestions` (reales de la DB) con fallback hardcodeado
+- `getChatSuggestions(db)` en `db.ts` consulta marcas, modelos, hospitales y ciudades únicos
+- `getSuggestions(followUp, observation)` en `chat.html` selecciona chips por intención
+- Cuando no hay sugerencias para una intención, se muestra el input de texto normal
+
 ## i18n (Multiidioma)
 
 Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
+
+### Selector de idioma (chat web)
+- Al iniciar el chat, el usuario debe seleccionar entre **Español** o **English**
+- El idioma se bloquea para toda la conversación (`setLockedLanguage()` en `Conversation`)
+- El servidor recibe `lang` en el request y lo bloquea al crear la sesión
+- La detección automática de idioma se desactiva cuando hay idioma bloqueado
+- No se puede enviar mensaje sin seleccionar idioma primero
 
 ### Detección de idioma (`src/agent/i18n.ts`)
 - Detección por palabras clave con pesos (no regex única)
@@ -119,6 +133,10 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - **`seedFromXlsx()`** acepta DB inyectada para tests. Tests usan `openDb(':memory:')`.
 - **Query de edad por filas, no promedios**: `queryInstalledBase` evalúa equipos
   individualmente ("2 MR viejos + 1 nuevo" matchea "MR >7 años").
+- **Language locking**: `Conversation.setLockedLanguage()` debe llamarse ANTES del primer `turn()`.
+  El `lang` en el request body se aplica solo al crear la sesión, no en sesiones existentes.
+- **Suggestion chips**: el input se oculta cuando hay chips. Si el usuario necesita escribir
+  algo que no está en los chips, debe usar "Otro..." o esperar a que no haya chips.
 
 ## Convenciones
 
@@ -140,6 +158,17 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - `PORT` — puerto del servidor (default: 4173 server, 4174 web)
 - `QVAC_CPU_ONLY=1` — forzar inferencia CPU sin Vulkan
 - `.env.example` documenta; nunca committear `.env`
+
+## API Endpoints
+
+- `POST /api/chat` — conversación principal (accepts `lang` param for locked language)
+- `POST /api/followup` — follow-up directo
+- `GET /api/suggestions` — retorna marcas, modelos, hospitales y ciudades de la DB para chips
+- `GET /api/stats` — estadísticas globales
+- `GET /api/customers` — Customer 360 de todos los clientes
+- `GET /api/customers/refresh` — candidatos para refrescar
+- `GET /api/query?q=<texto>` — NL analytics determinista
+- `GET /api/evidence` — exportar CSV de evidencia
 
 **Regla**: local y remoto devuelven el mismo `Extraction` vía `src/extract/provider.ts`
 (`createInference()`), así `Conversation` no sabe ni le importa el backend.
