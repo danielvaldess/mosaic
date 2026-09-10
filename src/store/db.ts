@@ -7,7 +7,7 @@ import type {
   Observation,
 } from '../types.js'
 
-export const DATA_DIR = join(process.cwd(), 'data')
+export const DATA_DIR = process.env.FIELDSIGHT_DATA_DIR ?? join(process.cwd(), 'data')
 export const DB_PATH = join(DATA_DIR, 'fieldsight.db')
 
 const SCHEMA = `

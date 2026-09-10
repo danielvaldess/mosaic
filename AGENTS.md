@@ -19,6 +19,10 @@ npm test               # vitest run
 npm run cli            # asistente conversacional por terminal
 npm run web            # chat web con IA → http://localhost:4174
 npm run server         # dashboard solo-lectura → http://localhost:4173
+npm run build          # compila src/ → dist/ (tsc) + copia HTML estáticos
+npm run desktop        # app Electron en dev (requiere build previo)
+npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
+npm run desktop:dist   # instalador NSIS → release/FieldSight-Setup-<version>.exe
 ```
 
 **En máquinas sin GPU / demos rápidas**, usa el modelo chico:
@@ -55,6 +59,13 @@ src/web-server.ts         ← servidor web con chat IA (API /api/chat, /api/foll
 src/web/chat.html         ← interfaz de chat: language selector + suggestion chips
 src/server.ts             ← dashboard solo-lectura (sin IA)
 src/server/index.html     ← HTML del dashboard
+src/electron/main.ts      ← shell Electron: ventana, arranque del server, single-instance, rutas de usuario
+src/electron/preload.cts  ← contextBridge para la pantalla de carga (IPC de progreso)
+src/electron/loading.html ← splash con progreso de descarga del modelo
+electron-builder.yml      ← config NSIS (asar off, poda de prebuilds no-win32-x64)
+tsconfig.build.json       ← build de producción (solo src/ → dist/)
+scripts/copy-static.mjs   ← copia chat/dashboard/loading a dist/
+scripts/png-to-ico.mjs    ← PNG 256x256 → build/icon.ico
 scripts/smoke-extract.ts  ← smoke test con modelo real
 scripts/convert-xlsx.mjs  ← conversor XLSX→JSON (one-time)
 scripts/voice-capture.mjs ← demo de transcripción WAV
@@ -137,6 +148,18 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
   El `lang` en el request body se aplica solo al crear la sesión, no en sesiones existentes.
 - **Suggestion chips**: el input se oculta cuando hay chips. Si el usuario necesita escribir
   algo que no está en los chips, debe usar "Otro..." o esperar a que no haya chips.
+- **Empaquetado desktop**: `asar: false` es obligatorio — el worker `bare` del SDK no puede
+  leer dentro de un asar. `npmRebuild: false` porque better-sqlite3 v13 trae prebuilds N-API.
+  `files` poda `prebuilds/` de otras plataformas (android/ios/darwin/linux/win32-arm64).
+- **Rutas de usuario en desktop**: `main.ts` fija `FIELDSIGHT_DATA_DIR`, `FIELDSIGHT_EVIDENCE_DIR`,
+  `FIELDSIGHT_SEED_PATH` y `QVAC_CONFIG_PATH` ANTES de importar los módulos (se leen al import).
+  La DB vive en `%APPDATA%\FieldSight\data` y el dummy se siembra en el primer arranque.
+- **Primer arranque**: `loadExtractionModel()` sube `QVAC_RPC_INIT_TIMEOUT_MS` a 180s porque el
+  escaneo de antivirus del runtime `bare` puede superar el default de 30s.
+- **Electron 44** no corre postinstall: el binario se descarga lazy al primer `require('electron')`
+  (o `node node_modules/electron/install.js`). Sin eso, `npm run desktop` falla en un clon limpio.
+- **electron-builder 26**: `publisherName` ya no existe en `win` (migrado a `signtoolOptions`);
+  el schema usa `additionalProperties: false`, cualquier clave extra rompe el build.
 
 ## Convenciones
 
@@ -153,6 +176,11 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - `FIELDSIGHT_OBSERVER` — identidad del observador (default "Field User 01")
 - `PORT` — puerto del servidor (default: 4173 server, 4174 web)
 - `QVAC_CPU_ONLY=1` — forzar inferencia CPU sin Vulkan
+- `FIELDSIGHT_DATA_DIR` — carpeta de la DB (default `cwd/data`; desktop → `%APPDATA%\FieldSight\data`)
+- `FIELDSIGHT_EVIDENCE_DIR` — carpeta del log auditable (default `cwd/evidence`)
+- `FIELDSIGHT_SEED_PATH` — JSON del dataset dummy para el seed automático
+- `QVAC_CONFIG_PATH` — ruta explícita a `qvac.config.json`
+- `QVAC_RPC_INIT_TIMEOUT_MS` — timeout del handshake del worker (default SDK 30s; `loadExtractionModel` lo sube a 180s)
 - `.env.example` documenta; nunca committear `.env`
 
 > **Decisión del equipo: inferencia FULL LOCAL.** Cada máquina corre el modelo

@@ -2,7 +2,7 @@ import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } fr
 import { join } from 'node:path'
 import type { EvidenceEntry } from '../types.js'
 
-const EVIDENCE_DIR = join(process.cwd(), 'evidence')
+const EVIDENCE_DIR = process.env.FIELDSIGHT_EVIDENCE_DIR ?? join(process.cwd(), 'evidence')
 const LOG_PATH = join(EVIDENCE_DIR, 'evidence.jsonl')
 
 export function initEvidence(): void {

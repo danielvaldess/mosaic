@@ -5,6 +5,8 @@
   "type": "module",
   "private": true,
   "license": "Apache-2.0",
+  "author": "FieldSight",
+  "main": "dist/electron/main.js",
   "engines": {
     "node": ">=22.17"
   },
@@ -16,6 +18,10 @@
     "seed": "tsx src/store/seed.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --win --dir",
+    "desktop:dist": "npm run build && electron-builder --win",
     "security:secrets": "trufflehog filesystem . --fail",
     "security:sast": "semgrep --config p/security-audit src --error",
     "security:sca": "npm audit"
@@ -28,12 +34,15 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^24.0.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
     "tsx": "^4.23.13",
     "typescript": "^5.8.0",
     "vitest": "^5.0.0"
   },
   "allowScripts": {
     "esbuild": true,
-    "better-sqlite3": true
+    "better-sqlite3": true,
+    "electron": true
   }
 }

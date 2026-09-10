@@ -99,6 +99,26 @@ máquina.
 > `src/extract/remote.ts` como referencia/opción futura, pero **no** es el camino
 > de la demo actual.
 
+## App de escritorio (.exe para Windows)
+
+La demo también se distribuye como app nativa (Electron + instalador NSIS).
+Cualquier máquina Windows la instala sin Node, sin Visual Studio y sin configuración:
+
+```bash
+npm run desktop        # app en dev (ventana nativa + chat)
+npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
+npm run desktop:dist   # instalador → release/FieldSight-Setup-<version>.exe
+```
+
+- Instalación por usuario (sin admin), accesos directos y desinstalador.
+- La primera vez descarga solo Qwen3-0.6B (~382 MB) con barra de progreso.
+- Los datos viven en `%APPDATA%\FieldSight` (DB, evidencia); el dataset dummy se
+  siembra automáticamente en el primer arranque.
+- La app es 100% local: la ventana carga el chat desde un servidor efímero en
+  `127.0.0.1` embebido en el proceso.
+- El instalador no está firmado digitalmente (sin certificado): Windows SmartScreen
+  puede pedir confirmación la primera vez.
+
 ## Modelos (registry QVAC)
 
 | Uso | Modelo | Tamaño |
@@ -154,8 +174,10 @@ reinicio del servidor ni a la recarga de la página. Las observaciones guardadas
 
 ### Windows (PowerShell)
 
-Si `npm ci` intenta compilar `better-sqlite3` con node-gyp, la versión fijada incluye
-binarios precompilados. Para instalar y comprobar la lógica sin ejecutar scripts de instalación:
+Si `npm ci` intenta compilar `better-sqlite3` con node-gyp (v13 publica prebuilds
+N-API, pero npm igual dispara el rebuild), instala **Visual Studio Build Tools 2022**
+con la carga "Desktop development with C++" y Python. Para instalar y comprobar la
+lógica sin ejecutar scripts de instalación:
 
 ```powershell
 npm ci --ignore-scripts

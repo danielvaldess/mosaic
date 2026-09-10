@@ -11,6 +11,14 @@ import { logEvidence } from '../evidence/logger.js'
 import { SYSTEM_PROMPT, EXTRACTION_SCHEMA, parseExtraction } from './prompt.js'
 import type { Extraction } from '../types.js'
 
+type ModelProgressListener = (update: ModelProgressUpdate) => void
+let modelProgressListener: ModelProgressListener | undefined
+
+/** Lets the desktop shell surface first-run model download progress. */
+export function setModelProgressListener(listener?: ModelProgressListener): void {
+  modelProgressListener = listener
+}
+
 /**
  * QVAC model for extraction. Defaults to Qwen3-4B for the target GPU box;
  * override to a smaller/cached model for quick local demos:
@@ -76,6 +84,9 @@ export async function extractObservation(
 
 export async function loadExtractionModel() {
   const t0 = Date.now()
+  // A cold machine can take well over the SDK's 30s default while antivirus
+  // scans the bundled bare runtime; this only bounds the handshake.
+  process.env['QVAC_RPC_INIT_TIMEOUT_MS'] ??= '180000'
   const modelId = await loadModel({
     // Union of two LLM descriptors confuses the overload resolution; both are
     // llamacpp-completion models, so pin to the Qwen3-4B descriptor type.
@@ -86,6 +97,7 @@ export async function loadExtractionModel() {
       process.stderr.write(
         `▸ Loading model ${p.percentage.toFixed(0)}% (${mb(p.downloaded)}/${mb(p.total)} MB)\r`,
       )
+      modelProgressListener?.(p)
     },
   })
   logEvidence({

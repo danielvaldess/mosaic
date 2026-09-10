@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <title>FieldSight</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      background: radial-gradient(1200px 600px at 50% -10%, #12304d 0%, #0b1220 55%, #070b14 100%);
+      color: #e6edf7;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      user-select: none;
+    }
+    main { text-align: center; width: 360px; }
+    .mark {
+      width: 64px; height: 64px; margin: 0 auto 18px;
+      display: grid; place-items: center;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #1f6feb, #0ea5e9);
+      box-shadow: 0 10px 30px rgba(31, 111, 235, .35);
+      font-size: 30px; font-weight: 700; color: #fff;
+    }
+    h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: .2px; }
+    .subtitle { margin: 0 0 26px; font-size: 12.5px; color: #8ea3bf; letter-spacing: .3px; }
+    .bar { height: 6px; border-radius: 999px; background: #16233a; overflow: hidden; }
+    #fill {
+      width: 6%; height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, #1f6feb, #38bdf8);
+      transition: width .25s ease;
+    }
+    #status { margin: 14px 0 0; font-size: 12.5px; color: #9fb3cc; min-height: 18px; }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .55; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark">F</div>
+    <h1>FieldSight</h1>
+    <p class="subtitle">Customer Installed Base Intelligence</p>
+    <div class="bar"><div id="fill"></div></div>
+    <p id="status" class="pulse">Starting FieldSight…</p>
+  </main>
+  <script>
+    const fill = document.getElementById('fill')
+    const status = document.getElementById('status')
+    if (window.fieldsight && window.fieldsight.onStatus) {
+      window.fieldsight.onStatus((update) => {
+        if (update.message) status.textContent = update.message
+        if (typeof update.progress === 'number') {
+          fill.style.width = Math.max(6, Math.min(100, update.progress)) + '%'
+        }
+      })
+    }
+  </script>
+</body>
+</html>
