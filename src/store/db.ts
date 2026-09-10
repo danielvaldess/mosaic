@@ -242,3 +242,30 @@ function mapObservation(r: Record<string, unknown>): Observation {
     createdAt: r.created_at as string,
   }
 }
+
+export interface ChatSuggestions {
+  brands: string[]
+  models: string[]
+  hospitals: string[]
+  cities: string[]
+}
+
+export function getChatSuggestions(db: Database.Database): ChatSuggestions {
+  const brands = db.prepare(
+    "SELECT DISTINCT brand FROM equipment WHERE brand IS NOT NULL AND brand != 'Unknown' ORDER BY brand"
+  ).all().map((r: any) => r.brand as string)
+
+  const models = db.prepare(
+    "SELECT DISTINCT model FROM equipment WHERE model IS NOT NULL AND model != 'Unknown' ORDER BY model"
+  ).all().map((r: any) => r.model as string)
+
+  const hospitals = db.prepare(
+    "SELECT DISTINCT name FROM customers WHERE name IS NOT NULL ORDER BY name"
+  ).all().map((r: any) => r.name as string)
+
+  const cities = db.prepare(
+    "SELECT DISTINCT city FROM customers WHERE city IS NOT NULL AND city != 'Unknown' ORDER BY city"
+  ).all().map((r: any) => r.city as string)
+
+  return { brands, models, hospitals, cities }
+}

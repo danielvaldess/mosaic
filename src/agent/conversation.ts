@@ -77,13 +77,23 @@ export class Conversation {
   private draft?: Observation
   private extraction?: Extraction
   private duplicateWarning = false
-  private detectedLang: Lang = 'en' // Track language from first input
+  private detectedLang: Lang = 'en'
+  private lockedLang?: Lang
   constructor(private db: Database.Database, private extract: (text: string) => Promise<Extraction>,
     private observer: string, private autoSave = false, private source: Observation['source'] = 'Text') {}
 
-  async turn(message: string, question?: string): Promise<AgentReply> {
-    // Detect language on first input or if explicitly set
-    if (!this.transcript || message.length > 10) {
+  setLockedLanguage(lang: Lang) {
+    this.lockedLang = lang
+    this.detectedLang = lang
+  }
+
+  async turn(message: string, question?: string, langOverride?: Lang): Promise<AgentReply> {
+    // Use locked language if set, otherwise detect from input
+    if (this.lockedLang) {
+      this.detectedLang = this.lockedLang
+    } else if (langOverride) {
+      this.detectedLang = langOverride
+    } else if (!this.transcript || message.length > 10) {
       this.detectedLang = detectLang(message)
     }
     const lang = this.detectedLang

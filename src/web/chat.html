@@ -494,6 +494,80 @@
     cursor: default;
   }
 
+  /* ---------- Suggestion Chips ---------- */
+
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .suggestions .chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid #DDD6C9;
+    background: #FAFAF7;
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: .15s ease;
+    white-space: nowrap;
+  }
+
+  .suggestions .chip:hover {
+    border-color: var(--blue);
+    background: #EFF4FB;
+    transform: translateY(-1px);
+  }
+
+  .suggestions .chip:disabled {
+    opacity: .5;
+    cursor: default;
+    transform: none;
+  }
+
+  .suggestions .chip-more {
+    color: var(--blue);
+    font-style: italic;
+  }
+
+  /* ---------- Language Selector ---------- */
+
+  .lang-selector {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .lang-btn {
+    padding: 12px 28px;
+    border-radius: 12px;
+    border: 2px solid #DDD6C9;
+    background: #FAFAF7;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lang-btn:hover {
+    border-color: var(--blue);
+    background: #EFF4FB;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(149,187,234,.2);
+  }
+
+  .lang-btn .flag {
+    font-size: 20px;
+  }
+
   /* ---------- Input ---------- */
 
   #input-area {
@@ -862,6 +936,17 @@
 
           <div id="messages">
             <div class="msg system">Describe el equipo médico que observaste. Mosaic extraerá la información relevante localmente.</div>
+            <div class="msg ai" id="lang-prompt">
+              <strong>Selecciona tu idioma / Choose your language:</strong>
+              <div class="lang-selector">
+                <button class="lang-btn" onclick="selectLanguage('es')">
+                  <span class="flag">🇪🇸</span> Español
+                </button>
+                <button class="lang-btn" onclick="selectLanguage('en')">
+                  <span class="flag">🇺🇸</span> English
+                </button>
+              </div>
+            </div>
           </div>
 
           <div id="input-area">
@@ -926,6 +1011,23 @@ const input = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
 let sessionId;
 let busy = false;
+let selectedLang = null;
+
+loadSuggestions();
+
+function selectLanguage(lang) {
+  selectedLang = lang;
+  const prompt = document.getElementById('lang-prompt');
+  if (prompt) {
+    prompt.querySelectorAll('.lang-btn').forEach(b => b.disabled = true);
+    const langName = lang === 'es' ? 'Español' : 'English';
+    prompt.innerHTML = '<strong>Idioma seleccionado:</strong> ' + langName;
+  }
+  input.placeholder = lang === 'es'
+    ? 'Ej.: Estoy en Hospital DemoCare Pacific, en Panamá. Tienen dos resonadores y un tomógrafo...'
+    : 'e.g. I\'m at Hospital DemoCare Pacific in Panama. They have two MRI systems and a CT scanner...';
+  input.focus();
+}
 
 function addMessage(text, type) {
   const div = document.createElement('div');
@@ -938,7 +1040,65 @@ function addMessage(text, type) {
 }
 
 function disableOldControls() {
-  messages.querySelectorAll('button,input').forEach(el => el.disabled = true);
+  messages.querySelectorAll('button,input,.chip').forEach(el => el.disabled = true);
+}
+
+/* ── Suggestions System ────────────────────────────────────────────────── */
+
+let realSuggestions = { brands: [], models: [], hospitals: [], cities: [] }
+
+async function loadSuggestions() {
+  try {
+    const res = await fetch('/api/suggestions')
+    if (res.ok) realSuggestions = await res.json()
+  } catch {}
+}
+
+const FALLBACK_SUGGESTIONS = {
+  brand: {
+    MR: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'Hitachi'],
+    CT: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'NeuroLogica'],
+    Ultrasound: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'Samsung'],
+    default: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'Hitachi'],
+  },
+  model: {
+    MR: ['Ingenia', 'Achieva', 'Skyra', 'Vida', 'SIGNA', 'Vantage'],
+    CT: ['IQon', 'Brilliance', 'Revolution', 'Aquilion', 'NeuViz'],
+    Ultrasound: ['EPIQ', 'Affiniti', 'LOGIQ', 'Vivid', 'Acuson'],
+    default: ['Unknown model'],
+  },
+  age: ['New (< 2 years)', '3–5 years', '5–10 years', '10–15 years', '15–20 years', '20+ years'],
+  quantity: ['1', '2', '3', '4', '5', '6+'],
+  customer: [],
+  location: [],
+  notes: [],
+}
+
+function getSuggestions(followUp, observation) {
+  const intent = followUp.intent
+  const modality = followUp.modality || 'default'
+
+  if (intent === 'brand') {
+    const dbbrands = realSuggestions.brands.filter(b => b !== 'Unknown')
+    if (dbbrands.length >= 3) return dbbrands.slice(0, 5)
+    return (FALLBACK_SUGGESTIONS.brand[modality] || FALLBACK_SUGGESTIONS.brand.default).slice(0, 5)
+  }
+  if (intent === 'model') {
+    const dbmodels = realSuggestions.models.filter(m => m !== 'Unknown')
+    if (dbmodels.length >= 3) return dbmodels.slice(0, 5)
+    return (FALLBACK_SUGGESTIONS.model[modality] || FALLBACK_SUGGESTIONS.model.default).slice(0, 5)
+  }
+  if (intent === 'customer') {
+    if (realSuggestions.hospitals.length >= 2) return realSuggestions.hospitals.slice(0, 5)
+    return []
+  }
+  if (intent === 'location') {
+    if (realSuggestions.cities.length >= 2) return realSuggestions.cities.slice(0, 5)
+    return []
+  }
+  if (intent === 'age') return FALLBACK_SUGGESTIONS.age.slice(0, 5)
+  if (intent === 'quantity') return FALLBACK_SUGGESTIONS.quantity.slice(0, 4)
+  return []
 }
 
 function showReply(data) {
@@ -968,22 +1128,37 @@ function showReply(data) {
       box.appendChild(remaining);
     }
 
-    const answer = document.createElement('input');
-    answer.placeholder = 'Escribe tu respuesta...';
+    const suggestions = getSuggestions(followUp, data.observation);
 
-    const button = document.createElement('button');
-    button.textContent = 'Enviar';
+    if (suggestions.length) {
+      const chipContainer = document.createElement('div');
+      chipContainer.className = 'suggestions';
+      for (const s of suggestions) {
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.textContent = s;
+        chip.onclick = () => request(s, followUp.question);
+        chipContainer.appendChild(chip);
+      }
+      box.append(document.createElement('br'), chipContainer);
+    } else {
+      const answer = document.createElement('input');
+      answer.placeholder = 'Escribe tu respuesta...';
 
-    const submit = () => {
-      if (answer.value.trim()) request(answer.value.trim(), followUp.question);
-    };
+      const button = document.createElement('button');
+      button.textContent = 'Enviar';
 
-    button.onclick = submit;
-    answer.onkeydown = e => {
-      if (e.key === 'Enter') submit();
-    };
+      const submit = () => {
+        if (answer.value.trim()) request(answer.value.trim(), followUp.question);
+      };
 
-    box.append(document.createElement('br'), answer, button);
+      button.onclick = submit;
+      answer.onkeydown = e => {
+        if (e.key === 'Enter') submit();
+      };
+
+      box.append(document.createElement('br'), answer, button);
+    }
   }
 
   if (data.observation?.equipment.length && !data.saved) {
@@ -1004,22 +1179,26 @@ function showReply(data) {
 
 async function request(message, question) {
   if (busy) return;
+  if (!selectedLang) {
+    addMessage(selectedLang === null ? 'Por favor selecciona un idioma primero / Please select a language first' : '', 'ai');
+    return;
+  }
 
   busy = true;
   sendBtn.disabled = true;
 
-  const activeControls = [...messages.querySelectorAll('button,input')].filter(el => !el.disabled);
+  const activeControls = [...messages.querySelectorAll('button,input,.chip')].filter(el => !el.disabled);
 
   disableOldControls();
   addMessage(message, 'user');
 
-  const waiting = addMessage('Procesando localmente…', 'system');
+  const waiting = addMessage(selectedLang === 'es' ? 'Procesando localmente…' : 'Processing locally…', 'system');
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message, question, sessionId})
+      body: JSON.stringify({message, question, sessionId, lang: selectedLang})
     });
 
     const data = await res.json();
@@ -1045,6 +1224,11 @@ async function request(message, question) {
 window.send = async function() {
   const text = input.value.trim();
   if (!text || busy) return;
+
+  if (!selectedLang) {
+    addMessage('Por favor selecciona un idioma primero / Please select a language first', 'ai');
+    return;
+  }
 
   input.value = '';
 

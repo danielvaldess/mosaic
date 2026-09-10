@@ -4,13 +4,14 @@ import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { Conversation } from './agent/conversation.js'
 import type { Extraction } from './types.js'
-import { allCustomers } from './store/db.js'
+import { allCustomers, getChatSuggestions } from './store/db.js'
 import { customer360, globalStats, queryInstalledBase } from './insights/insights.js'
 
 const requestSchema = z.object({
   message: z.string().trim().min(1).max(8000),
   sessionId: z.string().uuid().optional(),
   question: z.string().max(1000).optional(),
+  lang: z.enum(['en', 'es', 'pt', 'fr', 'de', 'it', 'nl']).optional(),
 })
 class HttpError extends Error { constructor(public status: number, message: string) { super(message) } }
 
@@ -55,12 +56,14 @@ export function createApp(options: {
         const sessionId = body.sessionId ?? randomUUID()
         if (!session) {
           if (sessions.size >= 100) throw new HttpError(503, 'Too many active conversations. Retry later.')
-          session = { conversation: new Conversation(options.db, options.extract, process.env.FIELDSIGHT_OBSERVER ?? 'Web User', options.autoSave), touched: now }
+          const conv = new Conversation(options.db, options.extract, process.env.FIELDSIGHT_OBSERVER ?? 'Web User', options.autoSave)
+          if (body.lang) conv.setLockedLanguage(body.lang)
+          session = { conversation: conv, touched: now }
           sessions.set(sessionId, session)
         }
         busy = true
         try {
-          const reply = await session.conversation.turn(body.message, body.question)
+          const reply = await session.conversation.turn(body.message, body.question, body.lang)
           session.touched = Date.now()
           json(res, { ...reply, reply: reply.message, sessionId, ms: Date.now() - now })
         } finally { busy = false }
@@ -73,6 +76,7 @@ export function createApp(options: {
       } else if (url.pathname === '/api/stats') json(res, globalStats(options.db))
       else if (url.pathname === '/api/customers') json(res, allCustomers(options.db).map(c => customer360(options.db, c)))
       else if (url.pathname === '/api/customers/refresh') json(res, globalStats(options.db).refreshCandidates)
+      else if (url.pathname === '/api/suggestions') json(res, getChatSuggestions(options.db))
       else if (url.pathname === '/api/query') {
         const q = url.searchParams.get('q')?.trim()
         if (!q) throw new HttpError(400, 'q parameter required')
