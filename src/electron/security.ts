@@ -15,18 +15,24 @@ const CSP = [
 ].join('; ')
 
 /** Applies session-wide hardening before any page loads. */
-export function applySecurityPolicies(): void {
+export function applySecurityPolicies(allowedOrigin: () => string | undefined): void {
   const target = session.defaultSession
   target.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [CSP] },
     })
   })
-  target.setPermissionRequestHandler((_contents, permission, callback) => {
-    log.warn(`Denied permission request: ${permission}`)
-    callback(false)
+  target.setPermissionRequestHandler((contents, permission, callback) => {
+    const origin = allowedOrigin()
+    const requestingUrl = contents.getURL()
+    const allowed = permission === 'geolocation' && origin !== undefined && requestingUrl.startsWith(origin)
+    if (!allowed) log.warn(`Denied permission request: ${permission}`)
+    callback(allowed)
   })
-  target.setPermissionCheckHandler(() => false)
+  target.setPermissionCheckHandler((_contents, permission, requestingOrigin) => {
+    const origin = allowedOrigin()
+    return permission === 'geolocation' && origin !== undefined && requestingOrigin.startsWith(origin)
+  })
 }
 
 /**

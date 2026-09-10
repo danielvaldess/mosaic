@@ -55,9 +55,11 @@ src/insights/insights.ts  ← Customer 360, stats globales, NL analytics determi
 src/evidence/logger.ts    ← log auditable (evidence/evidence.jsonl) + export CSV
 src/voice/transcribe.ts   ← STT Whisper on-device
 src/types.ts              ← tipos, MODALITIES, BRANDS, STATUSES, CONFIDENCES
+src/settings.ts           ← perfil persistido (nombre, idioma, ubicación) en data/settings.json
 src/cli.ts                ← asistente por terminal (entry point principal)
 src/web-server.ts         ← servidor web con chat IA (API /api/chat, /api/followup, /api/suggestions)
 src/web/chat.html         ← interfaz de chat: language selector + suggestion chips
+src/web/onboarding.html   ← primera ejecución: idioma (EN/ES), nombre y ubicación GPS
 src/server.ts             ← dashboard solo-lectura (sin IA)
 src/server/index.html     ← HTML del dashboard
 src/electron/main.ts      ← shell Electron: ventana, arranque del server, single-instance, rutas de usuario
@@ -179,6 +181,16 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
   Repo privado: requiere release publicado (no draft) y visibilidad/token para actualizar.
 - **Logs desktop**: electron-log escribe `%APPDATA%\Mosaic\logs\main.log`; el menú File/Help
   abre la carpeta. Los crashes del renderer muestran diálogo y quedan en el log.
+- **Onboarding (primera ejecución)**: `main.ts` decide entre `/onboarding` y `/` según
+  `onboardingComplete` en `settings.json`. Pasos: idioma (solo EN/ES) → nombre → ubicación
+  (GPS con fallback manual). El idioma queda bloqueado para SIEMPRE en todas las
+  conversaciones y el nombre se usa como `observer`. El chat oculta el selector de idioma
+  y saluda por nombre.
+- **Modelo lazy**: `startMosaicServer()` ya no espera al modelo; `createInference()` corre en
+  background y `/api/ready` reporta `{ ready, progress }`. La primera inferencia espera.
+  El splash usa `mosaic-logo.png` (copiado a dist/electron y dist/web).
+- **Solo EN/ES en desktop**: el backend i18n conserva los 7 idiomas (web/CLI), pero el
+  desktop ofrece y bloquea únicamente `en`/`es`.
 - **E2E**: Playwright lanza la app con `MOSAIC_LLM_URL` apuntando a un stub HTTP local,
   así no descarga modelo. `MOSAIC_USER_DATA_DIR` (env) aisla la DB/evidencia del test
   y permite modo portable.
@@ -221,6 +233,10 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 
 - `POST /api/chat` — conversación principal (accepts `lang` param for locked language)
 - `POST /api/followup` — follow-up directo
+- `GET/POST /api/settings` — perfil de primera ejecución (nombre, idioma, ubicación)
+- `GET /api/ready` — estado de carga del modelo `{ ready, progress }`
+- `GET /onboarding` — página de primera ejecución (solo desktop)
+- `GET /mosaic-logo.png` — logo servido para landing/onboarding
 - `GET /api/suggestions` — retorna marcas, modelos, hospitales y ciudades de la DB para chips
 - `GET /api/stats` — estadísticas globales
 - `GET /api/customers` — Customer 360 de todos los clientes

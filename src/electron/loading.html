@@ -17,13 +17,12 @@
       user-select: none;
     }
     main { text-align: center; width: 360px; }
-    .mark {
-      width: 64px; height: 64px; margin: 0 auto 18px;
-      display: grid; place-items: center;
-      border-radius: 16px;
-      background: linear-gradient(135deg, #1f6feb, #0ea5e9);
-      box-shadow: 0 10px 30px rgba(31, 111, 235, .35);
-      font-size: 30px; font-weight: 700; color: #fff;
+    .logo {
+      display: block;
+      width: 84px; height: 84px; margin: 0 auto 18px;
+      border-radius: 20px;
+      object-fit: cover;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
     }
     h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: .2px; }
     .subtitle { margin: 0 0 26px; font-size: 12.5px; color: #8ea3bf; letter-spacing: .3px; }
@@ -40,7 +39,7 @@
 </head>
 <body>
   <main>
-    <div class="mark">M</div>
+    <img class="logo" src="mosaic-logo.png" alt="Mosaic" />
     <h1>Mosaic</h1>
     <p class="subtitle">Customer Installed Base Intelligence</p>
     <div class="bar"><div id="fill"></div></div>

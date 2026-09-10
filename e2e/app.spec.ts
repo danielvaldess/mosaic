@@ -8,7 +8,7 @@ import { join } from 'node:path'
 /**
  * Deterministic end-to-end test: the app runs with MOSAIC_LLM_URL pointed at a
  * local stub that mimics the OpenAI-compatible QVAC server, so no model is
- * downloaded and the whole desktop flow (window, seeding, chat) is exercised.
+ * downloaded and the whole desktop flow (onboarding, seeding, chat) is tested.
  */
 const EXTRACTION = {
   customer: { name: 'Hospital DemoCare Pacific', city: 'Panama City', country: 'Panama' },
@@ -38,25 +38,34 @@ function startStub(): Promise<{ server: Server; port: number }> {
   })
 }
 
-test('launches, seeds the demo base and answers through the inference backend', async () => {
+test('first run onboards, greets in the chosen language and chats; settings persist', async () => {
   const { server, port } = await startStub()
   const userData = mkdtempSync(join(tmpdir(), 'mosaic-e2e-'))
+  const env = {
+    ...process.env,
+    PORT: '0',
+    MOSAIC_USER_DATA_DIR: userData,
+    MOSAIC_LLM_URL: `http://127.0.0.1:${port}/v1`,
+    MOSAIC_LLM_MODEL: 'stub',
+    MOSAIC_LLM_API_KEY: '',
+  }
   let app: ElectronApplication | undefined
   try {
-    app = await electron.launch({
-      args: ['.'],
-      env: {
-        ...process.env,
-        PORT: '0',
-        MOSAIC_USER_DATA_DIR: userData,
-        MOSAIC_LLM_URL: `http://127.0.0.1:${port}/v1`,
-        MOSAIC_LLM_MODEL: 'stub',
-        MOSAIC_LLM_API_KEY: '',
-      },
-    })
-    const page = await app.firstWindow()
+    // ── First run: onboarding flow ────────────────────────────────────────
+    app = await electron.launch({ args: ['.'], env })
+    let page = await app.firstWindow()
     await expect(page).toHaveTitle(/Mosaic/)
+    await expect(page.locator('#step-1')).toBeVisible()
+    await page.locator('.lang[data-lang="en"]').click()
+    await page.locator('#name').fill('Daniel')
+    await page.locator('#next-2').click()
+    await expect(page.locator('#step-3')).toBeVisible()
+    await page.locator('#skip-location').click()
+    await page.locator('#finish').click()
+
     await expect(page.locator('#chat-input')).toBeVisible()
+    await expect(page.locator('#messages')).toContainText('Daniel')
+    await expect(page.locator('#lang-prompt')).toHaveCount(0)
 
     const stats = await page.evaluate(async () => {
       const response = await fetch('/api/stats')
@@ -64,12 +73,20 @@ test('launches, seeds the demo base and answers through the inference backend', 
     })
     expect(stats.totalObservations).toBe(20)
 
-    await page.locator('.lang-btn').nth(1).click()
     await page.locator('#chat-input').fill(
       'I am at Hospital DemoCare Pacific in Panama. They have two MR systems and one CT.',
     )
     await page.locator('#send-btn').click()
     await expect(page.locator('#messages')).toContainText(/MR/i, { timeout: 60_000 })
+    await app.close()
+
+    // ── Second run: onboarding is skipped and language stays locked ───────
+    app = await electron.launch({ args: ['.'], env })
+    page = await app.firstWindow()
+    await expect(page.locator('#chat-input')).toBeVisible()
+    await expect(page.locator('#step-1')).toHaveCount(0)
+    await expect(page.locator('#lang-prompt')).toHaveCount(0)
+    await expect(page.locator('#messages')).toContainText('Daniel')
   } finally {
     await app?.close()
     server.close()

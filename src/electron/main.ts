@@ -128,7 +128,7 @@ function createWindow(): BrowserWindow {
 
 async function bootstrap(): Promise<void> {
   Menu.setApplicationMenu(buildMenu())
-  applySecurityPolicies()
+  applySecurityPolicies(allowedOrigin)
   installNavigationGuards(allowedOrigin)
 
   win = createWindow()
@@ -141,19 +141,20 @@ async function bootstrap(): Promise<void> {
     log.warn('Seed skipped', error)
   }
 
-  const { setModelProgressListener } = await import('../extract/extractor.js')
-  setModelProgressListener((update) => {
-    const pct = Math.round(update.percentage)
-    sendStatus(pct >= 100 ? 'Preparing the chat…' : `Downloading on-device AI model… ${pct}%`, update.percentage)
-  })
-
   const { startMosaicServer } = await import('../web-server.js')
-  const server = await startMosaicServer({ port: Number(process.env['PORT'] ?? 0) })
+  const server = await startMosaicServer({
+    port: Number(process.env['PORT'] ?? 0),
+    onModelProgress: (update) => {
+      const pct = Math.round(update.percentage)
+      sendStatus(pct >= 100 ? 'Preparing the chat…' : `Downloading on-device AI model… ${pct}%`, update.percentage)
+    },
+  })
   running = server
   appOrigin = `http://127.0.0.1:${server.port}`
-  setModelProgressListener(undefined)
   if (!win || win.isDestroyed()) return
-  await win.loadURL(`${appOrigin}/`)
+  const { loadSettings } = await import('../settings.js')
+  const initialPath = loadSettings().onboardingComplete ? '/' : '/onboarding'
+  await win.loadURL(`${appOrigin}${initialPath}`)
   setupAutoUpdates(() => win)
 }
 

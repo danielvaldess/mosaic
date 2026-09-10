@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" />
+  <title>Welcome to Mosaic</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 32px 16px;
+      background: radial-gradient(1200px 600px at 50% -10%, #12304d 0%, #0b1220 55%, #070b14 100%);
+      color: #e6edf7;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      user-select: none;
+    }
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: rgba(13, 21, 35, .82);
+      border: 1px solid #1d2c44;
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+    }
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+    .brand img { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; }
+    .brand h1 { margin: 0; font-size: 20px; font-weight: 600; }
+    .brand p { margin: 2px 0 0; font-size: 12.5px; color: #8ea3bf; }
+    .steps { display: flex; gap: 8px; margin-bottom: 24px; }
+    .steps span { height: 4px; flex: 1; border-radius: 999px; background: #1b2a42; transition: background .2s; }
+    .steps span.on { background: linear-gradient(90deg, #1f6feb, #38bdf8); }
+    h2 { font-size: 19px; margin: 0 0 8px; font-weight: 600; }
+    p.help { margin: 0 0 20px; font-size: 13.5px; color: #9fb3cc; line-height: 1.5; }
+    .lang-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button {
+      font: inherit;
+      border-radius: 12px;
+      border: 1px solid #263a58;
+      background: #14213a;
+      color: #e6edf7;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    button:hover { border-color: #3b82f6; background: #17284a; }
+    button.primary { background: linear-gradient(135deg, #1f6feb, #0ea5e9); border: none; color: #fff; font-weight: 600; }
+    button.primary:hover { filter: brightness(1.08); }
+    button:disabled { opacity: .55; cursor: default; }
+    .lang { padding: 18px; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .row { display: flex; gap: 12px; margin-top: 20px; }
+    .row .grow { flex: 1; }
+    label { display: block; font-size: 13.5px; color: #9fb3cc; margin-bottom: 8px; }
+    input[type="text"] {
+      width: 100%;
+      font: inherit;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid #263a58;
+      background: #0f1a2e;
+      color: #e6edf7;
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: #3b82f6; }
+    #gps-status { min-height: 20px; font-size: 13px; color: #7dd3a7; margin: 12px 0 0; }
+    #gps-status.error { color: #f3b0a0; }
+    details { margin-top: 16px; }
+    summary { cursor: pointer; color: #8ea3bf; font-size: 13.5px; }
+    details .row { margin-top: 12px; }
+    .status {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #1d2c44;
+      font-size: 12.5px;
+      color: #8ea3bf;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #f0b429; }
+    .status.ok .dot { background: #34d399; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">
+      <img src="/mosaic-logo.png" alt="Mosaic" />
+      <div>
+        <h1 id="t-title">Welcome to Mosaic</h1>
+        <p id="t-subtitle">Let's set things up in under a minute.</p>
+      </div>
+    </div>
+
+    <div class="steps" aria-hidden="true">
+      <span id="step-dot-1" class="on"></span><span id="step-dot-2"></span><span id="step-dot-3"></span>
+    </div>
+
+    <section id="step-1">
+      <h2 id="t-lang-title">Choose your language</h2>
+      <p class="help" id="t-lang-help">You can change it later from the app menu.</p>
+      <div class="lang-grid">
+        <button type="button" class="lang" data-lang="es"><span>🇪🇸</span> Español</button>
+        <button type="button" class="lang" data-lang="en"><span>🇺🇸</span> English</button>
+      </div>
+    </section>
+
+    <form id="form">
+      <section id="step-2" hidden>
+        <h2 id="t-name-title">What's your name?</h2>
+        <p class="help" id="t-name-help">It's used to credit the observations you capture.</p>
+        <label id="t-name-label" for="name">Your name</label>
+        <input id="name" type="text" maxlength="80" autocomplete="name" />
+        <div class="row">
+          <button type="button" id="back-1" data-back="1"></button>
+          <button type="submit" class="primary grow" id="next-2"></button>
+        </div>
+      </section>
+
+      <section id="step-3" hidden>
+        <h2 id="t-loc-title">Where are you now?</h2>
+        <p class="help" id="t-loc-help"></p>
+        <div class="row" style="margin-top:0">
+          <button type="button" class="primary grow" id="gps"></button>
+          <button type="button" id="skip-location"></button>
+        </div>
+        <p id="gps-status"></p>
+        <details>
+          <summary id="t-manual"></summary>
+          <div class="row">
+            <input class="grow" id="city" type="text" maxlength="120" />
+            <input class="grow" id="country" type="text" maxlength="120" />
+          </div>
+        </details>
+        <div class="row">
+          <button type="button" id="back-2" data-back="2"></button>
+          <button type="button" class="primary grow" id="finish"></button>
+        </div>
+      </section>
+    </form>
+
+    <div class="status" id="model-status" hidden>
+      <span class="dot"></span>
+      <span id="model-status-text"></span>
+    </div>
+  </main>
+
+  <script>
+    const COPY = {
+      en: {
+        subtitle: "Let's set things up in under a minute.",
+        langTitle: 'Choose your language',
+        langHelp: 'You can change it later from the app menu.',
+        nameTitle: "What's your name?",
+        nameHelp: "It's used to credit the observations you capture.",
+        nameLabel: 'Your name',
+        namePlaceholder: 'e.g. Daniel',
+        locTitle: 'Where are you now?',
+        locHelp: 'Mosaic can tag observations with your current location so the team knows where they came from. Coordinates stay on this device.',
+        gps: 'Use my location',
+        skip: 'Skip',
+        manual: 'Or type city and country',
+        city: 'City',
+        country: 'Country',
+        back: 'Back',
+        next: 'Continue',
+        finish: 'Start using Mosaic',
+        gpsOk: 'Location captured. You can still add city and country below.',
+        gpsErr: "We couldn't read the GPS. You can type city and country instead.",
+        preparing: (pct) => `Preparing the on-device AI model… ${pct}%`,
+        ready: 'On-device AI model ready',
+      },
+      es: {
+        subtitle: 'Vamos a configurarlo en menos de un minuto.',
+        langTitle: 'Elige tu idioma',
+        langHelp: 'Podrás cambiarlo luego desde el menú de la app.',
+        nameTitle: '¿Cómo te llamas?',
+        nameHelp: 'Se usa para acreditar las observaciones que capturas.',
+        nameLabel: 'Tu nombre',
+        namePlaceholder: 'Ej.: Daniel',
+        locTitle: '¿Dónde estás ahora?',
+        locHelp: 'Mosaic puede etiquetar las observaciones con tu ubicación actual para que el equipo sepa de dónde vienen. Las coordenadas no salen de este dispositivo.',
+        gps: 'Usar mi ubicación',
+        skip: 'Omitir',
+        manual: 'O escribe ciudad y país',
+        city: 'Ciudad',
+        country: 'País',
+        back: 'Atrás',
+        next: 'Continuar',
+        finish: 'Empezar a usar Mosaic',
+        gpsOk: 'Ubicación capturada. Puedes agregar ciudad y país abajo.',
+        gpsErr: 'No pudimos leer el GPS. Puedes escribir ciudad y país.',
+        preparing: (pct) => `Preparando el modelo de IA local… ${pct}%`,
+        ready: 'Modelo de IA local listo',
+      },
+    }
+
+    const state = { language: null, name: '', location: null }
+    const $ = (id) => document.getElementById(id)
+    const texts = () => COPY[state.language || 'en']
+
+    function applyCopy() {
+      const t = texts()
+      document.documentElement.lang = state.language || 'en'
+      document.title = state.language === 'es' ? 'Bienvenido a Mosaic' : 'Welcome to Mosaic'
+      $('t-title').textContent = state.language === 'es' ? 'Bienvenido a Mosaic' : 'Welcome to Mosaic'
+      $('t-subtitle').textContent = t.subtitle
+      $('t-lang-title').textContent = t.langTitle
+      $('t-lang-help').textContent = t.langHelp
+      $('t-name-title').textContent = t.nameTitle
+      $('t-name-help').textContent = t.nameHelp
+      $('t-name-label').textContent = t.nameLabel
+      $('name').placeholder = t.namePlaceholder
+      $('t-loc-title').textContent = t.locTitle
+      $('t-loc-help').textContent = t.locHelp
+      $('gps').textContent = t.gps
+      $('skip-location').textContent = t.skip
+      $('t-manual').textContent = t.manual
+      $('city').placeholder = t.city
+      $('country').placeholder = t.country
+      $('back-1').textContent = t.back
+      $('back-2').textContent = t.back
+      $('next-2').textContent = t.next
+      $('finish').textContent = t.finish
+    }
+
+    function showStep(step) {
+      $('step-1').hidden = step !== 1
+      $('step-2').hidden = step !== 2
+      $('step-3').hidden = step !== 3
+      for (const n of [1, 2, 3]) $('step-dot-' + n).classList.toggle('on', n <= step)
+      if (step === 2) $('name').focus()
+    }
+
+    for (const button of document.querySelectorAll('.lang')) {
+      button.addEventListener('click', () => {
+        state.language = button.dataset.lang
+        applyCopy()
+        showStep(2)
+      })
+    }
+
+    document.querySelectorAll('[data-back]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const target = Number(button.dataset.back)
+        if (target === 1) showStep(1)
+        else { $('step-2').hidden = false; $('step-3').hidden = true }
+      })
+    })
+
+    $('form').addEventListener('submit', (event) => {
+      event.preventDefault()
+      const name = $('name').value.trim()
+      if (!name) { $('name').focus(); return }
+      state.name = name
+      showStep(3)
+    })
+
+    $('gps').addEventListener('click', () => {
+      const status = $('gps-status')
+      status.classList.remove('error')
+      status.textContent = '…'
+      if (!navigator.geolocation) { status.classList.add('error'); status.textContent = texts().gpsErr; return }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          state.location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          }
+          status.textContent = texts().gpsOk
+        },
+        () => { status.classList.add('error'); status.textContent = texts().gpsErr },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      )
+    })
+
+    $('skip-location').addEventListener('click', () => {
+      state.location = null
+      $('gps-status').classList.remove('error')
+      $('gps-status').textContent = ''
+    })
+
+    $('finish').addEventListener('click', async () => {
+      const location = { ...(state.location ?? {}) }
+      const city = $('city').value.trim()
+      const country = $('country').value.trim()
+      if (city) location.city = city
+      if (country) location.country = country
+      const payload = { name: state.name, language: state.language }
+      if (Object.keys(location).length) payload.location = location
+      $('finish').disabled = true
+      try {
+        const response = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!response.ok) throw new Error('save failed')
+        window.location.replace('/')
+      } catch {
+        $('finish').disabled = false
+        $('gps-status').classList.add('error')
+        $('gps-status').textContent = state.language === 'es'
+          ? 'No se pudo guardar la configuración. Intenta de nuevo.'
+          : 'Could not save your settings. Please try again.'
+      }
+    })
+
+    async function pollModelStatus() {
+      try {
+        const response = await fetch('/api/ready')
+        const status = await response.json()
+        const box = $('model-status')
+        const text = $('model-status-text')
+        if (status.ready) {
+          box.hidden = false
+          box.classList.add('ok')
+          text.textContent = texts().ready
+          return
+        }
+        box.hidden = false
+        box.classList.remove('ok')
+        const pct = Math.round(status.progress || 0)
+        text.textContent = pct > 0 ? texts().preparing(pct) : texts().preparing(0)
+        setTimeout(pollModelStatus, 2500)
+      } catch {
+        setTimeout(pollModelStatus, 4000)
+      }
+    }
+
+    applyCopy()
+    pollModelStatus()
+  </script>
+</body>
+</html>

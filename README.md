@@ -111,6 +111,12 @@ npm run desktop:dist   # instalador → release/Mosaic-Setup-<version>.exe
 ```
 
 - Instalación por usuario (sin admin), accesos directos y desinstalador.
+- **Primera ejecución (onboarding)**: la app pregunta idioma (**solo English/Español**),
+  tu nombre y tu ubicación actual (GPS con opción manual). Se guarda en
+  `%APPDATA%\Mosaic\data\settings.json`: el idioma queda fijado para siempre en todas
+  las conversaciones con la IA y el nombre firma tus observaciones.
+- Tras el onboarding, lo primero que ves es el **chat saludándote por nombre** en tu idioma,
+  con el modelo cargando en segundo plano (barra de progreso en el splash/onboarding).
 - La primera vez descarga solo Qwen3-0.6B (~382 MB) con barra de progreso.
 - Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia, logs); el dataset dummy se
   siembra automáticamente en el primer arranque.

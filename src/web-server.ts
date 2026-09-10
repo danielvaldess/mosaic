@@ -1,31 +1,60 @@
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import type { ModelProgressUpdate } from '@qvac/sdk'
 import { openDb } from './store/db.js'
-import { createInference } from './extract/provider.js'
+import { createInference, type ExtractFn, type InferenceHandle } from './extract/provider.js'
+import { setModelProgressListener } from './extract/extractor.js'
 import { initEvidence, exportEvidenceCsv } from './evidence/logger.js'
 import { createApp } from './http-app.js'
 
 export interface MosaicServer {
   port: number
+  ready: () => { ready: boolean; progress: number }
   close: () => Promise<void>
 }
 
 /**
- * Boots the API + chat UI and starts listening. Shared by the terminal
- * entrypoint (npm run web) and the Electron desktop shell, which passes
- * port 0 so the OS assigns a free port.
+ * Boots the API + chat UI and starts listening immediately. The model loads in
+ * the background (the desktop shell shows onboarding/progress meanwhile); the
+ * first inference waits for it through `extract`.
  */
 export async function startMosaicServer(
-  options: { port?: number; host?: string } = {},
+  options: { port?: number; host?: string; onModelProgress?: (update: ModelProgressUpdate) => void } = {},
 ): Promise<MosaicServer> {
   initEvidence()
   const db = openDb()
-  const inference = await createInference()
+  let modelReady = false
+  let modelProgress = 0
+  let inference: InferenceHandle | undefined
+  let inferenceError: unknown
+
+  const inferencePromise = createInference().then((handle) => {
+    inference = handle
+    modelReady = true
+    modelProgress = 100
+    return handle
+  })
+  inferencePromise.catch((error: unknown) => { inferenceError = error })
+
+  setModelProgressListener((update) => {
+    modelProgress = update.percentage
+    options.onModelProgress?.(update)
+  })
+
+  const extract: ExtractFn = async (text) => {
+    if (inferenceError) throw inferenceError
+    const handle = inference ?? await inferencePromise
+    return handle.extract(text)
+  }
+
   const server = createApp({
-    db, extract: inference.extract,
+    db, extract,
     chatHtml: readFileSync(new URL('./web/chat.html', import.meta.url), 'utf8'),
     dashboardHtml: readFileSync(new URL('./server/index.html', import.meta.url), 'utf8'),
+    onboardingHtml: readFileSync(new URL('./web/onboarding.html', import.meta.url), 'utf8'),
+    logoPng: readFileSync(new URL('./web/mosaic-logo.png', import.meta.url)),
     evidence: exportEvidenceCsv, autoSave: process.env.MOSAIC_AUTOSAVE === '1',
+    ready: () => ({ ready: modelReady, progress: modelProgress }),
   })
   const host = options.host ?? '127.0.0.1'
   const requestedPort = options.port ?? Number(process.env.PORT ?? 4174)
@@ -42,12 +71,20 @@ export async function startMosaicServer(
   const close = () => {
     closing ??= new Promise<void>((resolve) => {
       server.close(() => {
-        void inference.dispose().catch(console.error).finally(() => { db.close(); resolve() })
+        setModelProgressListener(undefined)
+        if (inference) {
+          void inference.dispose().catch(console.error).finally(() => { db.close(); resolve() })
+        } else {
+          // Model still loading: never block shutdown on a background download.
+          void inferencePromise.catch(() => {}).then(() => inference?.dispose()).catch(console.error)
+          db.close()
+          resolve()
+        }
       })
     })
     return closing
   }
-  return { port, close }
+  return { port, ready: () => ({ ready: modelReady, progress: modelProgress }), close }
 }
 
 async function main() {
