@@ -12,12 +12,12 @@ import type { Extraction } from '../types.js'
  * reaching a third-party cloud. This is "delegated peer-to-peer" inference,
  * allowed by the Philips brief.
  *
- * Point FieldSight at the peer's server with:
- *   FIELDSIGHT_LLM_URL=http://<peer-ip>:11437/v1
- *   FIELDSIGHT_LLM_MODEL=fieldsight-llm   (the alias configured on the server)
- *   FIELDSIGHT_LLM_API_KEY=<key>          (required when the peer binds to the LAN)
+ * Point Mosaic at the peer's server with:
+ *   MOSAIC_LLM_URL=http://<peer-ip>:11437/v1
+ *   MOSAIC_LLM_MODEL=mosaic-llm   (the alias configured on the server)
+ *   MOSAIC_LLM_API_KEY=<key>          (required when the peer binds to the LAN)
  *
- * If FIELDSIGHT_LLM_URL is not set, FieldSight uses the local QVAC model.
+ * If MOSAIC_LLM_URL is not set, Mosaic uses the local QVAC model.
  */
 
 const OPENAI_TIMEOUT_MS = 120_000
@@ -29,18 +29,18 @@ export interface RemoteConfig {
 }
 
 export function remoteConfigFromEnv(env: NodeJS.ProcessEnv = process.env): RemoteConfig | undefined {
-  const baseUrl = env.FIELDSIGHT_LLM_URL
+  const baseUrl = env.MOSAIC_LLM_URL
   if (!baseUrl) return undefined
   const trimmed = baseUrl.replace(/\/+$/, '')
   if (!/\/v1$/.test(trimmed)) {
     throw new Error(
-      'FIELDSIGHT_LLM_URL must point at the OpenAI-compatible base, e.g. http://<peer-ip>:11437/v1',
+      'MOSAIC_LLM_URL must point at the OpenAI-compatible base, e.g. http://<peer-ip>:11437/v1',
     )
   }
   return {
     baseUrl: trimmed,
-    model: env.FIELDSIGHT_LLM_MODEL ?? 'fieldsight-llm',
-    apiKey: env.FIELDSIGHT_LLM_API_KEY,
+    model: env.MOSAIC_LLM_MODEL ?? 'mosaic-llm',
+    apiKey: env.MOSAIC_LLM_API_KEY,
   }
 }
 

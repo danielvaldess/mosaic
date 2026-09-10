@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
-  <title>FieldSight</title>
+  <title>Mosaic</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -40,17 +40,17 @@
 </head>
 <body>
   <main>
-    <div class="mark">F</div>
-    <h1>FieldSight</h1>
+    <div class="mark">M</div>
+    <h1>Mosaic</h1>
     <p class="subtitle">Customer Installed Base Intelligence</p>
     <div class="bar"><div id="fill"></div></div>
-    <p id="status" class="pulse">Starting FieldSight…</p>
+    <p id="status" class="pulse">Starting Mosaic…</p>
   </main>
   <script>
     const fill = document.getElementById('fill')
     const status = document.getElementById('status')
-    if (window.fieldsight && window.fieldsight.onStatus) {
-      window.fieldsight.onStatus((update) => {
+    if (window.mosaic && window.mosaic.onStatus) {
+      window.mosaic.onStatus((update) => {
         if (update.message) status.textContent = update.message
         if (typeof update.progress === 'number') {
           fill.style.width = Math.max(6, Math.min(100, update.progress)) + '%'

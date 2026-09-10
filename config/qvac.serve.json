@@ -1,7 +1,7 @@
 {
   "serve": {
     "models": {
-      "fieldsight-llm": {
+      "mosaic-llm": {
         "model": "QWEN3_4B_INST_Q4_K_M",
         "preload": true,
         "config": { "ctx_size": 8192 }

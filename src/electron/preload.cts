@@ -5,8 +5,8 @@ interface LauncherStatus {
   progress?: number
 }
 
-contextBridge.exposeInMainWorld('fieldsight', {
+contextBridge.exposeInMainWorld('mosaic', {
   onStatus: (callback: (status: LauncherStatus) => void): void => {
-    ipcRenderer.on('fieldsight:status', (_event, status: LauncherStatus) => callback(status))
+    ipcRenderer.on('mosaic:status', (_event, status: LauncherStatus) => callback(status))
   },
 })

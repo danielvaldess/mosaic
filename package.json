@@ -1,11 +1,11 @@
 {
-  "name": "fieldsight",
+  "name": "mosaic",
   "version": "0.1.0",
-  "description": "FieldSight - Customer Installed Base Intelligence. Captura conversacional de observaciones de campo con IA local (QVAC).",
+  "description": "Mosaic - Customer Installed Base Intelligence. Captura conversacional de observaciones de campo con IA local (QVAC).",
   "type": "module",
   "private": true,
   "license": "Apache-2.0",
-  "author": "FieldSight",
+  "author": "Mosaic",
   "main": "dist/electron/main.js",
   "engines": {
     "node": ">=22.17"

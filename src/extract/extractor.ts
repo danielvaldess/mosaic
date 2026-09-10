@@ -22,13 +22,13 @@ export function setModelProgressListener(listener?: ModelProgressListener): void
 /**
  * QVAC model for extraction. Defaults to Qwen3-4B for the target GPU box;
  * override to a smaller/cached model for quick local demos:
- *   FIELDSIGHT_EXTRACT_MODEL=small npm run cli
+ *   MOSAIC_EXTRACT_MODEL=small npm run cli
  */
 export const EXTRACTION_MODEL =
-  process.env.FIELDSIGHT_EXTRACT_MODEL === 'small' ? QWEN3_600M_INST_Q4 : QWEN3_4B_INST_Q4_K_M
+  process.env.MOSAIC_EXTRACT_MODEL === 'small' ? QWEN3_600M_INST_Q4 : QWEN3_4B_INST_Q4_K_M
 
 export const EXTRACTION_MODEL_NAME =
-  process.env.FIELDSIGHT_EXTRACT_MODEL === 'small' ? 'QWEN3_600M_INST_Q4' : 'QWEN3_4B_INST_Q4_K_M'
+  process.env.MOSAIC_EXTRACT_MODEL === 'small' ? 'QWEN3_600M_INST_Q4' : 'QWEN3_4B_INST_Q4_K_M'
 
 /**
  * Strict JSON Schema the LLM must fill. Tolerant by design: every field is

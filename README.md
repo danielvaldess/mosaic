@@ -87,14 +87,14 @@ funcionan tal cual en cualquier equipo. En máquinas modestas, el modelo chico
 reduce la carga:
 
 ```bash
-FIELDSIGHT_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB) en vez del 4B
+MOSAIC_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB) en vez del 4B
 ```
 
 El modelo 4B (~2.5GB) se descarga del registry QVAC al primer uso y se cachea en
 `~/.qvac/models/`. La inferencia sobre los datos del cliente nunca sale de la
 máquina.
 
-> La delegación P2P a un server remoto (FIELDSIGHT_LLM_URL y
+> La delegación P2P a un server remoto (MOSAIC_LLM_URL y
 > `docs/GUIDE_GPU_SERVER.md`) quedó implementada y verificada en
 > `src/extract/remote.ts` como referencia/opción futura, pero **no** es el camino
 > de la demo actual.
@@ -107,12 +107,12 @@ Cualquier máquina Windows la instala sin Node, sin Visual Studio y sin configur
 ```bash
 npm run desktop        # app en dev (ventana nativa + chat)
 npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
-npm run desktop:dist   # instalador → release/FieldSight-Setup-<version>.exe
+npm run desktop:dist   # instalador → release/Mosaic-Setup-<version>.exe
 ```
 
 - Instalación por usuario (sin admin), accesos directos y desinstalador.
 - La primera vez descarga solo Qwen3-0.6B (~382 MB) con barra de progreso.
-- Los datos viven en `%APPDATA%\FieldSight` (DB, evidencia); el dataset dummy se
+- Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia); el dataset dummy se
   siembra automáticamente en el primer arranque.
 - La app es 100% local: la ventana carga el chat desde un servidor efímero en
   `127.0.0.1` embebido en el proceso.
@@ -165,7 +165,7 @@ y usa `save anyway` para guardarlo como una observación nueva.
 
 La confirmación no vuelve a ejecutar la IA. `reviewConfirmed` indica que el usuario
 revisó el registro; los equipos con edades estimadas conservan el estado `Estimated`.
-`FIELDSIGHT_AUTOSAVE=1` permite guardar sin revisión, pero no evita la advertencia de duplicados.
+`MOSAIC_AUTOSAVE=1` permite guardar sin revisión, pero no evita la advertencia de duplicados.
 
 `npm run web` sirve el chat en `http://localhost:4174` y el panel en
 `http://localhost:4174/dashboard`. Los servidores escuchan solo en la máquina local.
@@ -184,7 +184,7 @@ npm ci --ignore-scripts
 npm run typecheck
 npm test
 npm run seed
-$env:FIELDSIGHT_EXTRACT_MODEL = "small"
+$env:MOSAIC_EXTRACT_MODEL = "small"
 npm run web
 ```
 

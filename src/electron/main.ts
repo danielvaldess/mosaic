@@ -1,19 +1,19 @@
 import { app, BrowserWindow, Menu, dialog, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { FieldSightServer } from '../web-server.js'
+import type { MosaicServer } from '../web-server.js'
 
-app.setName('FieldSight')
-app.setAppUserModelId('com.fieldsight.app')
+app.setName('Mosaic')
+app.setAppUserModelId('com.mosaic.app')
 
 const isPackaged = app.isPackaged
 
 // Resolve storage paths and the demo-friendly model before the server modules
 // load, because they capture env vars at import time.
-process.env['FIELDSIGHT_EXTRACT_MODEL'] ??= 'small'
-process.env['FIELDSIGHT_DATA_DIR'] ??= join(app.getPath('userData'), 'data')
-process.env['FIELDSIGHT_EVIDENCE_DIR'] ??= join(app.getPath('userData'), 'evidence')
-process.env['FIELDSIGHT_SEED_PATH'] ??= isPackaged
+process.env['MOSAIC_EXTRACT_MODEL'] ??= 'small'
+process.env['MOSAIC_DATA_DIR'] ??= join(app.getPath('userData'), 'data')
+process.env['MOSAIC_EVIDENCE_DIR'] ??= join(app.getPath('userData'), 'evidence')
+process.env['MOSAIC_SEED_PATH'] ??= isPackaged
   ? join(process.resourcesPath, 'dummy_installed_base.json')
   : join(process.cwd(), 'data', 'dummy_installed_base.json')
 process.env['QVAC_CONFIG_PATH'] ??= isPackaged
@@ -25,12 +25,12 @@ const iconPath = isPackaged
   : join(process.cwd(), 'build', 'icon.ico')
 
 let win: BrowserWindow | null = null
-let running: FieldSightServer | null = null
+let running: MosaicServer | null = null
 let quitting = false
 
 function sendStatus(message: string, progress?: number): void {
   if (!win || win.isDestroyed()) return
-  win.webContents.send('fieldsight:status', { message, progress })
+  win.webContents.send('mosaic:status', { message, progress })
 }
 
 function createWindow(): BrowserWindow {
@@ -41,7 +41,7 @@ function createWindow(): BrowserWindow {
     minHeight: 640,
     show: false,
     backgroundColor: '#0b1220',
-    title: 'FieldSight',
+    title: 'Mosaic',
     ...(existsSync(iconPath) ? { icon: iconPath } : {}),
     webPreferences: {
       preload: join(import.meta.dirname, 'preload.cjs'),
@@ -84,8 +84,8 @@ async function bootstrap(): Promise<void> {
     sendStatus(pct >= 100 ? 'Preparing the chat…' : `Downloading on-device AI model… ${pct}%`, update.percentage)
   })
 
-  const { startFieldSightServer } = await import('../web-server.js')
-  const server = await startFieldSightServer({ port: Number(process.env['PORT'] ?? 0) })
+  const { startMosaicServer } = await import('../web-server.js')
+  const server = await startMosaicServer({ port: Number(process.env['PORT'] ?? 0) })
   running = server
   setModelProgressListener(undefined)
   if (!win || win.isDestroyed()) return
@@ -114,7 +114,7 @@ if (!gotLock) {
     .then(bootstrap)
     .catch((error: unknown) => {
       console.error(error)
-      dialog.showErrorBox('FieldSight', error instanceof Error ? error.message : String(error))
+      dialog.showErrorBox('Mosaic', error instanceof Error ? error.message : String(error))
       app.quit()
     })
 }

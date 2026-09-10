@@ -56,7 +56,7 @@ export function createApp(options: {
         const sessionId = body.sessionId ?? randomUUID()
         if (!session) {
           if (sessions.size >= 100) throw new HttpError(503, 'Too many active conversations. Retry later.')
-          const conv = new Conversation(options.db, options.extract, process.env.FIELDSIGHT_OBSERVER ?? 'Web User', options.autoSave)
+          const conv = new Conversation(options.db, options.extract, process.env.MOSAIC_OBSERVER ?? 'Web User', options.autoSave)
           if (body.lang) conv.setLockedLanguage(body.lang)
           session = { conversation: conv, touched: now }
           sessions.set(sessionId, session)

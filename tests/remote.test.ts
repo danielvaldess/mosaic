@@ -29,22 +29,22 @@ async function startMockServer(handler: (body: unknown, req: import('node:http')
 }
 
 describe('remoteConfigFromEnv', () => {
-  it('returns undefined when FIELDSIGHT_LLM_URL is not set', () => {
+  it('returns undefined when MOSAIC_LLM_URL is not set', () => {
     expect(remoteConfigFromEnv({})).toBeUndefined()
   })
 
   it('reads baseUrl and model from env, normalizing trailing slash', () => {
-    const cfg = remoteConfigFromEnv({ FIELDSIGHT_LLM_URL: 'http://192.168.1.5:11434/v1/', FIELDSIGHT_LLM_MODEL: 'fieldsight-llm', FIELDSIGHT_LLM_API_KEY: 'k' })
-    expect(cfg).toEqual({ baseUrl: 'http://192.168.1.5:11434/v1', model: 'fieldsight-llm', apiKey: 'k' })
+    const cfg = remoteConfigFromEnv({ MOSAIC_LLM_URL: 'http://192.168.1.5:11434/v1/', MOSAIC_LLM_MODEL: 'mosaic-llm', MOSAIC_LLM_API_KEY: 'k' })
+    expect(cfg).toEqual({ baseUrl: 'http://192.168.1.5:11434/v1', model: 'mosaic-llm', apiKey: 'k' })
   })
 
-  it('defaults model to fieldsight-llm', () => {
-    const cfg = remoteConfigFromEnv({ FIELDSIGHT_LLM_URL: 'http://x:11434/v1' })
-    expect(cfg?.model).toBe('fieldsight-llm')
+  it('defaults model to mosaic-llm', () => {
+    const cfg = remoteConfigFromEnv({ MOSAIC_LLM_URL: 'http://x:11434/v1' })
+    expect(cfg?.model).toBe('mosaic-llm')
   })
 
   it('rejects a URL that does not point at /v1', () => {
-    expect(() => remoteConfigFromEnv({ FIELDSIGHT_LLM_URL: 'http://192.168.1.5:11434' })).toThrow(/must point at the OpenAI-compatible base/)
+    expect(() => remoteConfigFromEnv({ MOSAIC_LLM_URL: 'http://192.168.1.5:11434' })).toThrow(/must point at the OpenAI-compatible base/)
   })
 })
 
@@ -58,13 +58,13 @@ describe('extractRemote', () => {
         messages: Array<{ role: string; content: string }>
         response_format: { type: string; json_schema: { name: string; schema: unknown } }
       }
-      expect(b.model).toBe('fieldsight-llm')
+      expect(b.model).toBe('mosaic-llm')
       expect(b.temperature).toBe(0)
       expect(b.response_format.type).toBe('json_schema')
       expect(b.response_format.json_schema.name).toBe('observation_extraction')
       expect(b.response_format.json_schema.schema).toEqual(EXTRACTION_SCHEMA)
       expect(b.messages[0]!.role).toBe('system')
-      expect(b.messages[0]!.content).toContain('FieldSight')
+      expect(b.messages[0]!.content).toContain('Mosaic')
       expect(b.messages[1]!.content).toBe('two MR systems')
       return {
         body: {
@@ -73,7 +73,7 @@ describe('extractRemote', () => {
         },
       }
     })
-    const cfg: RemoteConfig = { baseUrl, model: 'fieldsight-llm' }
+    const cfg: RemoteConfig = { baseUrl, model: 'mosaic-llm' }
     const extraction = await extractRemote(cfg, 'two MR systems')
     expect(extraction.equipment).toEqual([{ modality: 'MR', quantity: 2 }])
     expect(extraction.customer?.name).toBe('Hospital X')

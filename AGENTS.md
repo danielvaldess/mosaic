@@ -1,6 +1,6 @@
-# AGENTS.md — FieldSight
+# AGENTS.md — Mosaic
 
-FieldSight captura observaciones de campo de ingenieros y las convierte en una base
+Mosaic captura observaciones de campo de ingenieros y las convierte en una base
 estructurada de equipos médicos instalados, con IA **100% local** vía `@qvac/sdk`.
 
 ## Regla de oro
@@ -22,14 +22,14 @@ npm run server         # dashboard solo-lectura → http://localhost:4173
 npm run build          # compila src/ → dist/ (tsc) + copia HTML estáticos
 npm run desktop        # app Electron en dev (requiere build previo)
 npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
-npm run desktop:dist   # instalador NSIS → release/FieldSight-Setup-<version>.exe
+npm run desktop:dist   # instalador NSIS → release/Mosaic-Setup-<version>.exe
 ```
 
 **En máquinas sin GPU / demos rápidas**, usa el modelo chico:
 
 ```bash
-FIELDSIGHT_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB)
-FIELDSIGHT_EXTRACT_MODEL=small npm run web   # misma opción para web
+MOSAIC_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB)
+MOSAIC_EXTRACT_MODEL=small npm run web   # misma opción para web
 node --import tsx scripts/smoke-extract.ts   # smoke test end-to-end
 ```
 
@@ -151,9 +151,9 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - **Empaquetado desktop**: `asar: false` es obligatorio — el worker `bare` del SDK no puede
   leer dentro de un asar. `npmRebuild: false` porque better-sqlite3 v13 trae prebuilds N-API.
   `files` poda `prebuilds/` de otras plataformas (android/ios/darwin/linux/win32-arm64).
-- **Rutas de usuario en desktop**: `main.ts` fija `FIELDSIGHT_DATA_DIR`, `FIELDSIGHT_EVIDENCE_DIR`,
-  `FIELDSIGHT_SEED_PATH` y `QVAC_CONFIG_PATH` ANTES de importar los módulos (se leen al import).
-  La DB vive en `%APPDATA%\FieldSight\data` y el dummy se siembra en el primer arranque.
+- **Rutas de usuario en desktop**: `main.ts` fija `MOSAIC_DATA_DIR`, `MOSAIC_EVIDENCE_DIR`,
+  `MOSAIC_SEED_PATH` y `QVAC_CONFIG_PATH` ANTES de importar los módulos (se leen al import).
+  La DB vive en `%APPDATA%\Mosaic\data` y el dummy se siembra en el primer arranque.
 - **Primer arranque**: `loadExtractionModel()` sube `QVAC_RPC_INIT_TIMEOUT_MS` a 180s porque el
   escaneo de antivirus del runtime `bare` puede superar el default de 30s.
 - **Electron 44** no corre postinstall: el binario se descarga lazy al primer `require('electron')`
@@ -171,21 +171,21 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 
 ## Env vars
 
-- `FIELDSIGHT_EXTRACT_MODEL=small` — Qwen3-0.6B en vez del 4B por defecto
-- `FIELDSIGHT_AUTOSAVE=1` — guarda sin confirmación
-- `FIELDSIGHT_OBSERVER` — identidad del observador (default "Field User 01")
+- `MOSAIC_EXTRACT_MODEL=small` — Qwen3-0.6B en vez del 4B por defecto
+- `MOSAIC_AUTOSAVE=1` — guarda sin confirmación
+- `MOSAIC_OBSERVER` — identidad del observador (default "Field User 01")
 - `PORT` — puerto del servidor (default: 4173 server, 4174 web)
 - `QVAC_CPU_ONLY=1` — forzar inferencia CPU sin Vulkan
-- `FIELDSIGHT_DATA_DIR` — carpeta de la DB (default `cwd/data`; desktop → `%APPDATA%\FieldSight\data`)
-- `FIELDSIGHT_EVIDENCE_DIR` — carpeta del log auditable (default `cwd/evidence`)
-- `FIELDSIGHT_SEED_PATH` — JSON del dataset dummy para el seed automático
+- `MOSAIC_DATA_DIR` — carpeta de la DB (default `cwd/data`; desktop → `%APPDATA%\Mosaic\data`)
+- `MOSAIC_EVIDENCE_DIR` — carpeta del log auditable (default `cwd/evidence`)
+- `MOSAIC_SEED_PATH` — JSON del dataset dummy para el seed automático
 - `QVAC_CONFIG_PATH` — ruta explícita a `qvac.config.json`
 - `QVAC_RPC_INIT_TIMEOUT_MS` — timeout del handshake del worker (default SDK 30s; `loadExtractionModel` lo sube a 180s)
 - `.env.example` documenta; nunca committear `.env`
 
 > **Decisión del equipo: inferencia FULL LOCAL.** Cada máquina corre el modelo
 > con su propio hardware (GPU vía Vulkan, o CPU como fallback automático). El
-> modo de delegación remota (FIELDSIGHT_LLM_URL/MODEL/API_KEY y
+> modo de delegación remota (MOSAIC_LLM_URL/MODEL/API_KEY y
 > `config/qvac.serve.json`) quedó implementado y verificado en
 > `src/extract/remote.ts`, pero NO es el camino actual — se mantiene solo como
 > referencia/opción futura. No introducir dependencia de un server remoto en la

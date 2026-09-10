@@ -1,6 +1,6 @@
-appId: com.fieldsight.app
-productName: FieldSight
-copyright: © 2026 FieldSight
+appId: com.mosaic.app
+productName: Mosaic
+copyright: © 2026 Mosaic
 
 directories:
   output: release
@@ -49,7 +49,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: FieldSight
-  uninstallDisplayName: FieldSight
+  shortcutName: Mosaic
+  uninstallDisplayName: Mosaic
   deleteAppDataOnUninstall: false
   artifactName: ${productName}-Setup-${version}.${ext}

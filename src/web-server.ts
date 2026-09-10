@@ -5,7 +5,7 @@ import { createInference } from './extract/provider.js'
 import { initEvidence, exportEvidenceCsv } from './evidence/logger.js'
 import { createApp } from './http-app.js'
 
-export interface FieldSightServer {
+export interface MosaicServer {
   port: number
   close: () => Promise<void>
 }
@@ -15,9 +15,9 @@ export interface FieldSightServer {
  * entrypoint (npm run web) and the Electron desktop shell, which passes
  * port 0 so the OS assigns a free port.
  */
-export async function startFieldSightServer(
+export async function startMosaicServer(
   options: { port?: number; host?: string } = {},
-): Promise<FieldSightServer> {
+): Promise<MosaicServer> {
   initEvidence()
   const db = openDb()
   const inference = await createInference()
@@ -25,7 +25,7 @@ export async function startFieldSightServer(
     db, extract: inference.extract,
     chatHtml: readFileSync(new URL('./web/chat.html', import.meta.url), 'utf8'),
     dashboardHtml: readFileSync(new URL('./server/index.html', import.meta.url), 'utf8'),
-    evidence: exportEvidenceCsv, autoSave: process.env.FIELDSIGHT_AUTOSAVE === '1',
+    evidence: exportEvidenceCsv, autoSave: process.env.MOSAIC_AUTOSAVE === '1',
   })
   const host = options.host ?? '127.0.0.1'
   const requestedPort = options.port ?? Number(process.env.PORT ?? 4174)
@@ -51,8 +51,8 @@ export async function startFieldSightServer(
 }
 
 async function main() {
-  const running = await startFieldSightServer()
-  console.log(`FieldSight → http://localhost:${running.port}`)
+  const running = await startMosaicServer()
+  console.log(`Mosaic → http://localhost:${running.port}`)
   let stopping = false
   const shutdown = () => {
     if (stopping) return

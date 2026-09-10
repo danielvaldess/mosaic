@@ -13,7 +13,7 @@ export interface InferenceHandle {
 
 /**
  * Unified inference entrypoint. Chooses the backend automatically:
- *  - FIELDSIGHT_LLM_URL set  → delegate to a peer's QVAC HTTP server (GPU).
+ *  - MOSAIC_LLM_URL set  → delegate to a peer's QVAC HTTP server (GPU).
  *  - otherwise               → load the local QVAC model on this machine.
  *
  * Both paths return the same ExtractFn consumed by Conversation, so the

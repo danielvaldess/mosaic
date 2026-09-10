@@ -10,7 +10,7 @@ import type { Observation, EquipmentObservation } from '../types.js'
  * data/dummy_installed_base.json at build time (see scripts/convert-xlsx.mjs).
  * This removes the vulnerable `xlsx` runtime dependency (GHSA-4r6h-8v6p-xvw6).
  */
-const JSON_PATH = process.env.FIELDSIGHT_SEED_PATH ?? join(process.cwd(), 'data', 'dummy_installed_base.json')
+const JSON_PATH = process.env.MOSAIC_SEED_PATH ?? join(process.cwd(), 'data', 'dummy_installed_base.json')
 
 interface DummyRow {
   'Observation ID': string | number
