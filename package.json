@@ -20,9 +20,11 @@
     "test:e2e": "npm run build && playwright test",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
+    "model:fetch": "node scripts/fetch-model.mjs",
     "desktop": "npm run build && electron .",
     "desktop:pack": "npm run build && electron-builder --win --dir",
-    "desktop:dist": "npm run build && electron-builder --win",
+    "desktop:dist": "npm run build && node scripts/build-desktop.mjs",
+    "desktop:dist:offline": "npm run build && node scripts/build-desktop.mjs --offline",
     "security:secrets": "trufflehog filesystem . --fail",
     "security:sast": "semgrep --config p/security-audit src --error",
     "security:sca": "npm audit"

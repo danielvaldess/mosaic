@@ -105,11 +105,20 @@ La demo también se distribuye como app nativa (Electron + instalador NSIS).
 Cualquier máquina Windows la instala sin Node, sin Visual Studio y sin configuración:
 
 ```bash
-npm run desktop        # app en dev (ventana nativa + chat)
-npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
-npm run desktop:dist   # instalador → release/Mosaic-Setup-<version>.exe
+npm run desktop                # app en dev (ventana nativa + chat)
+npm run desktop:pack           # app empaquetada sin instalador → release/win-unpacked/
+npm run model:fetch            # descarga el modelo para empaquetarlo (offline)
+npm run desktop:dist           # instalador → release/Mosaic-Setup-<version>.exe
+npm run desktop:dist:offline   # igual, garantizando el modelo bundleado
 ```
 
+- **Un solo .exe, todo incluido**: el instalador offline (**~1.2 GB**) lleva Electron,
+  Node, el runtime de IA (QVAC + bare + addons nativos) y el modelo **Qwen3-1.7B Q4_0**
+  (~1 GB). La app funciona sin internet desde el primer segundo.
+- Si `assets/models/` está vacío, `desktop:dist` produce el instalador liviano (~254 MB)
+  que descarga el modelo al primer uso.
+- NSIS tiene un tope de ~2 GB por instalador: por eso se bundlea el 1.7B (el 4B de
+  ~2.5 GB requiere un compilador NSIS especial; ver `scripts/fetch-model.mjs`).
 - Instalación por usuario (sin admin), accesos directos y desinstalador.
 - **Primera ejecución (onboarding)**: la app pregunta idioma (**solo English/Español**),
   tu nombre y tu ubicación actual (GPS con opción manual). Se guarda en
@@ -117,7 +126,7 @@ npm run desktop:dist   # instalador → release/Mosaic-Setup-<version>.exe
   las conversaciones con la IA y el nombre firma tus observaciones.
 - Tras el onboarding, lo primero que ves es el **chat saludándote por nombre** en tu idioma,
   con el modelo cargando en segundo plano (barra de progreso en el splash/onboarding).
-- La primera vez descarga solo Qwen3-0.6B (~382 MB) con barra de progreso.
+- El modelo corre en **GPU (Vulkan) cuando está disponible** y cae a CPU automáticamente.
 - Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia, logs); el dataset dummy se
   siembra automáticamente en el primer arranque.
 - La app es 100% local: la ventana carga el chat desde un servidor efímero en
@@ -143,7 +152,9 @@ npm run desktop:dist   # instalador → release/Mosaic-Setup-<version>.exe
 
 | Uso | Modelo | Tamaño |
 |-----|--------|--------|
-| Extracción LLM | `QWEN3_4B_INST_Q4_K_M` | ~2.5 GB |
+| Extracción (bundleado en el .exe) | `QWEN3_1_7B_INST_Q4` (`Qwen3-1.7B-Q4_0.gguf`) | ~1.0 GB |
+| Extracción (CLI/web, descarga) | `QWEN3_4B_INST_Q4_K_M` | ~2.5 GB |
+| Extracción liviana | `QWEN3_600M_INST_Q4` | ~0.4 GB |
 | Voz (STT) | `WHISPER_TINY` | ~75 MB |
 
 Todos se descargan del registro distribuido QVAC al primer uso (`modelRegistry*`). También puedes apuntar `modelSrc` a cualquier `.gguf` local o URL de HuggingFace.

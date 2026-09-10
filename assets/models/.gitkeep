@@ -1,0 +1,1 @@
+# Bundled .gguf models live here (gitignored). Run `npm run model:fetch`.

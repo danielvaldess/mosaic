@@ -25,6 +25,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Fetch bundled AI model (offline installer)
+        run: npm run model:fetch
       - name: Build installer and publish draft release
         shell: pwsh
         run: |

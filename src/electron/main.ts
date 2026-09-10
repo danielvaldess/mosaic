@@ -15,9 +15,8 @@ app.enableSandbox()
 
 const isPackaged = app.isPackaged
 
-// Resolve storage paths and the demo-friendly model before the server modules
-// load, because they capture env vars at import time.
-process.env['MOSAIC_EXTRACT_MODEL'] ??= 'small'
+// Resolve storage paths and the bundled model before the server modules load,
+// because they capture env vars at import time.
 process.env['MOSAIC_DATA_DIR'] ??= join(app.getPath('userData'), 'data')
 process.env['MOSAIC_EVIDENCE_DIR'] ??= join(app.getPath('userData'), 'evidence')
 process.env['MOSAIC_SEED_PATH'] ??= isPackaged
@@ -26,6 +25,13 @@ process.env['MOSAIC_SEED_PATH'] ??= isPackaged
 process.env['QVAC_CONFIG_PATH'] ??= isPackaged
   ? join(process.resourcesPath, 'qvac.config.json')
   : join(process.cwd(), 'qvac.config.json')
+
+const bundledModelPath = isPackaged
+  ? join(process.resourcesPath, 'models', 'Qwen3-1.7B-Q4_0.gguf')
+  : join(process.cwd(), 'assets', 'models', 'Qwen3-1.7B-Q4_0.gguf')
+if (process.env['MOSAIC_EXTRACT_MODEL'] !== 'small' && existsSync(bundledModelPath)) {
+  process.env['MOSAIC_MODEL_PATH'] ??= bundledModelPath
+}
 
 const iconPath = isPackaged
   ? join(process.resourcesPath, 'icon.ico')

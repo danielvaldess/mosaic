@@ -22,7 +22,9 @@ npm run server         # dashboard solo-lectura → http://localhost:4173
 npm run build          # compila src/ → dist/ (tsc) + copia HTML estáticos
 npm run desktop        # app Electron en dev (requiere build previo)
 npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
+npm run model:fetch    # trae el Qwen3-1.7B a assets/models (offline installer)
 npm run desktop:dist   # instalador NSIS → release/Mosaic-Setup-<version>.exe
+npm run desktop:dist:offline # igual pero forzando model:fetch antes
 npm run test:e2e       # build + Playwright sobre la app Electron (stub LLM local)
 ```
 
@@ -76,6 +78,8 @@ vitest.config.ts          ← limita vitest a tests/** (excluye e2e/)
 electron-builder.yml      ← config NSIS (asar off, poda de prebuilds no-win32-x64)
 tsconfig.build.json       ← build de producción (solo src/ → dist/)
 scripts/copy-static.mjs   ← copia chat/dashboard/loading a dist/
+scripts/fetch-model.mjs   ← descarga/verifica el .gguf bundleado (assets/models, gitignored)
+scripts/build-desktop.mjs ← build del instalador (--offline fuerza el modelo)
 scripts/png-to-ico.mjs    ← PNG 256x256 → build/icon.ico
 scripts/smoke-extract.ts  ← smoke test con modelo real
 scripts/convert-xlsx.mjs  ← conversor XLSX→JSON (one-time)
@@ -191,6 +195,13 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
   El splash usa `mosaic-logo.png` (copiado a dist/electron y dist/web).
 - **Solo EN/ES en desktop**: el backend i18n conserva los 7 idiomas (web/CLI), pero el
   desktop ofrece y bloquea únicamente `en`/`es`.
+- **Modelo bundleado**: `main.ts` setea `MOSAIC_MODEL_PATH` al `.gguf` de `resources/models/`
+  si existe; `loadExtractionModel()` lo carga con `modelSrc: <path>, modelType: 'llamacpp-completion'`.
+  Sin bundle cae al descriptor del registry. `assets/models/*.gguf` está gitignored.
+- **Límite NSIS**: los instaladores NSIS no pueden superar ~2 GB, por eso se bundlea el
+  Qwen3-1.7B (~1 GB) y no el 4B (~2.5 GB). El instalador offline queda en ~1.2 GB.
+- **Filtro de modalidades**: `mentions()` es accent-insensitive y acepta plurales; sin eso
+  "resonadores magneticos" / "tomografo" se descartaban (ver test en `tests/grounding.test.ts`).
 - **E2E**: Playwright lanza la app con `MOSAIC_LLM_URL` apuntando a un stub HTTP local,
   así no descarga modelo. `MOSAIC_USER_DATA_DIR` (env) aisla la DB/evidencia del test
   y permite modo portable.
@@ -217,6 +228,7 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - `MOSAIC_SEED_PATH` — JSON del dataset dummy para el seed automático
 - `MOSAIC_AUTO_UPDATE=1` — chequea updates al arrancar (default: solo manual desde el menú Help)
 - `MOSAIC_USER_DATA_DIR` — override de userData (tests E2E / modo portable)
+- `MOSAIC_MODEL_PATH` — ruta a un `.gguf` local (la setea el desktop para el modelo bundleado)
 - `QVAC_CONFIG_PATH` — ruta explícita a `qvac.config.json`
 - `QVAC_RPC_INIT_TIMEOUT_MS` — timeout del handshake del worker (default SDK 30s; `loadExtractionModel` lo sube a 180s)
 - `.env.example` documenta; nunca committear `.env`

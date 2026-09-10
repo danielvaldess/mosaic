@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { basename } from 'node:path'
 import {
   completion,
   loadModel,
@@ -29,6 +31,13 @@ export const EXTRACTION_MODEL =
 
 export const EXTRACTION_MODEL_NAME =
   process.env.MOSAIC_EXTRACT_MODEL === 'small' ? 'QWEN3_600M_INST_Q4' : 'QWEN3_4B_INST_Q4_K_M'
+
+let loadedModelName = EXTRACTION_MODEL_NAME
+
+/** Name of the model actually loaded (bundled file name wins). */
+export function currentModelName(): string {
+  return loadedModelName
+}
 
 /**
  * Strict JSON Schema the LLM must fill. Tolerant by design: every field is
@@ -66,7 +75,7 @@ export async function extractObservation(
   logEvidence({
     ts: new Date().toISOString(),
     op: 'inference',
-    model: EXTRACTION_MODEL_NAME,
+    model: currentModelName(),
     modelId,
     prompt: rawInput,
     promptTokens: stats?.promptTokens,
@@ -87,23 +96,34 @@ export async function loadExtractionModel() {
   // A cold machine can take well over the SDK's 30s default while antivirus
   // scans the bundled bare runtime; this only bounds the handshake.
   process.env['QVAC_RPC_INIT_TIMEOUT_MS'] ??= '180000'
-  const modelId = await loadModel({
-    // Union of two LLM descriptors confuses the overload resolution; both are
-    // llamacpp-completion models, so pin to the Qwen3-4B descriptor type.
-    modelSrc: EXTRACTION_MODEL as typeof QWEN3_4B_INST_Q4_K_M,
-    modelConfig: { ctx_size: 8192 } as Record<string, unknown>,
-    onProgress: (p: ModelProgressUpdate) => {
-      const mb = (n: number) => (n / 1e6).toFixed(1)
-      process.stderr.write(
-        `▸ Loading model ${p.percentage.toFixed(0)}% (${mb(p.downloaded)}/${mb(p.total)} MB)\r`,
-      )
-      modelProgressListener?.(p)
-    },
-  })
+  const reportProgress = (p: ModelProgressUpdate) => {
+    const mb = (n: number) => (n / 1e6).toFixed(1)
+    process.stderr.write(
+      `▸ Loading model ${p.percentage.toFixed(0)}% (${mb(p.downloaded)}/${mb(p.total)} MB)\r`,
+    )
+    modelProgressListener?.(p)
+  }
+  const bundled = process.env['MOSAIC_MODEL_PATH']
+  const usingBundled = bundled !== undefined && bundled !== '' && existsSync(bundled)
+  const modelId = usingBundled
+    ? await loadModel({
+        modelSrc: bundled,
+        modelType: 'llamacpp-completion',
+        modelConfig: { ctx_size: 8192 } as Record<string, unknown>,
+        onProgress: reportProgress,
+      })
+    : await loadModel({
+        // Union of two LLM descriptors confuses the overload resolution; both are
+        // llamacpp-completion models, so pin to the Qwen3-4B descriptor type.
+        modelSrc: EXTRACTION_MODEL as typeof QWEN3_4B_INST_Q4_K_M,
+        modelConfig: { ctx_size: 8192 } as Record<string, unknown>,
+        onProgress: reportProgress,
+      })
+  loadedModelName = usingBundled && bundled ? basename(bundled) : EXTRACTION_MODEL_NAME
   logEvidence({
     ts: new Date().toISOString(),
     op: 'model_load',
-    model: EXTRACTION_MODEL_NAME,
+    model: loadedModelName,
     modelId,
     totalMs: Date.now() - t0,
   })

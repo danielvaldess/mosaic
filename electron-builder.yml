@@ -35,6 +35,10 @@ extraResources:
     to: qvac.config.json
   - from: build/icon.ico
     to: icon.ico
+  # Bundled models for the offline installer (empty unless `npm run model:fetch`).
+  - from: assets/models
+    to: models
+    filter: ['*.gguf']
 
 win:
   target:

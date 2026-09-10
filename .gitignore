@@ -12,6 +12,9 @@ playwright-report/
 # QVAC model cache (multi-GB downloads)
 .qvac/
 
+# Bundled models for the offline installer (fetched with npm run model:fetch)
+assets/models/*.gguf
+
 # Local data (DB, evidence logs) - keep sample data, ignore generated
 data/*.db
 data/*.db-journal
