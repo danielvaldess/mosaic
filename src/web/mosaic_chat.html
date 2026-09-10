@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mosaic — Nueva observación</title>
+
+<style>
+  :root {
+    --cream: #FFF8E7;
+    --red: #930500;
+    --blue: #95BBEA;
+
+    --ink: #20283A;
+    --ink-soft: #536078;
+    --muted: #7D8798;
+    --line: #E6E1D6;
+    --surface: #FFFFFF;
+    --surface-soft: #FBF8F0;
+    --blue-soft: #EDF4FC;
+    --red-soft: #F8EAE8;
+    --success: #3D765A;
+    --shadow: 0 12px 35px rgba(32, 40, 58, .08);
+    --radius-lg: 22px;
+    --radius-md: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.5;
+    min-height: 100%;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button, input, textarea { font: inherit; }
+
+  button { cursor: pointer; }
+
+  .app-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+  }
+
+  /* ---------- Sidebar ---------- */
+
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 26px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 2px 10px 26px;
+  }
+
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+  }
+
+  .brand-name {
+    color: var(--red);
+    font-size: 25px;
+    line-height: 1;
+    font-weight: 750;
+    letter-spacing: -.7px;
+  }
+
+  .brand-tagline {
+    margin-top: 6px;
+    color: var(--ink-soft);
+    font-size: 10px;
+    line-height: 1.25;
+    letter-spacing: .6px;
+  }
+
+  .nav-label {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    padding: 0 12px 9px;
+  }
+
+  .nav {
+    display: grid;
+    gap: 4px;
+  }
+
+  .nav button {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--ink-soft);
+    text-align: left;
+    border-radius: 12px;
+    padding: 11px 12px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-size: 13px;
+    transition: .18s ease;
+  }
+
+  .nav button:hover {
+    background: var(--surface-soft);
+    color: var(--red);
+  }
+
+  .nav button.active {
+    background: var(--red);
+    color: #fff;
+    box-shadow: 0 7px 18px rgba(147, 5, 0, .16);
+  }
+
+  .nav-icon {
+    width: 19px;
+    text-align: center;
+    font-size: 15px;
+    opacity: .9;
+  }
+
+  .sidebar-spacer { flex: 1; }
+
+  .local-card {
+    background: var(--blue-soft);
+    border: 1px solid #DCEAF9;
+    border-radius: 16px;
+    padding: 15px;
+  }
+
+  .local-card .local-title {
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 750;
+    margin-bottom: 4px;
+  }
+
+  .local-card p {
+    color: var(--ink-soft);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .local-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    color: var(--success);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .local-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 4px rgba(61, 118, 90, .09);
+  }
+
+  .sidebar-footer {
+    color: var(--muted);
+    font-size: 9px;
+    text-align: center;
+    padding-top: 14px;
+  }
+
+  /* ---------- Main ---------- */
+
+  .main-shell {
+    min-width: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    height: 72px;
+    flex: 0 0 72px;
+    background: rgba(255,255,255,.84);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 34px;
+  }
+
+  .breadcrumb {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .breadcrumb strong {
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .top-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .top-btn {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-soft);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 11px;
+    transition: .18s ease;
+  }
+
+  .top-btn:hover {
+    border-color: var(--blue);
+    color: var(--red);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #D9EBDD;
+    background: #F3FAF5;
+    color: var(--success);
+    border-radius: 999px;
+    padding: 7px 11px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .status-pill .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .4; }
+  }
+
+  .content {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    padding: 42px 38px 55px;
+    flex: 1;
+  }
+
+  .hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 30px;
+    margin-bottom: 28px;
+  }
+
+  .eyebrow {
+    color: var(--red);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.7px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .hero h1 {
+    color: var(--ink);
+    font-size: clamp(29px, 4vw, 43px);
+    line-height: 1.04;
+    letter-spacing: -1.5px;
+    font-weight: 760;
+  }
+
+  .hero p {
+    max-width: 610px;
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin-top: 10px;
+  }
+
+  .mosaic-decoration {
+    width: 100px;
+    height: 76px;
+    position: relative;
+    flex: 0 0 auto;
+    opacity: .9;
+  }
+
+  .mosaic-decoration span {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border-radius: 13px 13px 13px 4px;
+    transform: rotate(45deg);
+  }
+
+  .mosaic-decoration .d1 { left: 4px; top: 24px; background: var(--red); }
+  .mosaic-decoration .d2 { left: 31px; top: 4px; background: var(--blue); }
+  .mosaic-decoration .d3 { left: 58px; top: 24px; background: var(--red); }
+  .mosaic-decoration .d4 { left: 31px; top: 44px; background: var(--blue); }
+
+  /* ---------- Conversation panel ---------- */
+
+  .conversation-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 265px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .conversation-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .conversation-head {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .conversation-title {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+
+  .conversation-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--red-soft);
+    color: var(--red);
+    display: grid;
+    place-items: center;
+    font-size: 16px;
+  }
+
+  .conversation-title h2 {
+    font-size: 15px;
+    line-height: 1.2;
+    font-weight: 750;
+  }
+
+  .conversation-title p {
+    color: var(--muted);
+    font-size: 10px;
+    margin-top: 3px;
+  }
+
+  .powered {
+    color: var(--ink-soft);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .powered strong {
+    color: var(--red);
+  }
+
+  #messages {
+    height: min(53vh, 560px);
+    min-height: 360px;
+    overflow-y: auto;
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    background:
+      radial-gradient(circle at 95% 0%, rgba(149,187,234,.12), transparent 28%),
+      var(--surface);
+  }
+
+  .msg {
+    max-width: 78%;
+    padding: 12px 15px;
+    border-radius: 15px;
+    font-size: 13px;
+    line-height: 1.55;
+    animation: fadeIn .2s ease;
+    white-space: pre-wrap;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.user {
+    align-self: flex-end;
+    background: var(--red);
+    color: #fff;
+    border-bottom-right-radius: 5px;
+    box-shadow: 0 5px 14px rgba(147,5,0,.13);
+  }
+
+  .msg.ai {
+    align-self: flex-start;
+    background: var(--blue-soft);
+    color: var(--ink);
+    border: 1px solid #DCEAF9;
+    border-bottom-left-radius: 5px;
+  }
+
+  .msg.system {
+    align-self: center;
+    max-width: 90%;
+    background: var(--surface-soft);
+    color: var(--muted);
+    border: 1px dashed #DDD6C9;
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .msg .meta {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  .msg.ai .meta span { color: var(--red); }
+
+  .msg button {
+    margin: 9px 7px 0 0;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 650;
+    transition: .15s ease;
+  }
+
+  .msg button:hover {
+    border-color: var(--blue);
+    transform: translateY(-1px);
+  }
+
+  .msg input {
+    margin-top: 9px;
+    width: min(300px, 100%);
+    padding: 9px 11px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    outline: none;
+    font-size: 12px;
+  }
+
+  .msg input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(149,187,234,.16);
+  }
+
+  .msg button:disabled,
+  .msg input:disabled {
+    opacity: .5;
+    cursor: default;
+  }
+
+  /* ---------- Input ---------- */
+
+  #input-area {
+    flex-shrink: 0;
+    padding: 17px 20px 20px;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .input-wrap {
+    display: flex;
+    gap: 10px;
+    background: var(--surface-soft);
+    border: 1px solid #DDD6C9;
+    border-radius: 16px;
+    padding: 8px 8px 8px 15px;
+    transition: .2s ease;
+  }
+
+  .input-wrap:focus-within {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 4px rgba(149,187,234,.13);
+  }
+
+  #chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-size: 13px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 44px;
+    max-height: 130px;
+    padding-top: 9px;
+  }
+
+  #chat-input::placeholder { color: #9BA3B1; }
+
+  #send-btn {
+    background: var(--red);
+    color: #fff;
+    border: none;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: .18s ease;
+    box-shadow: 0 6px 14px rgba(147,5,0,.16);
+  }
+
+  #send-btn:hover {
+    background: #7D0400;
+    transform: translateY(-1px);
+  }
+
+  #send-btn:disabled {
+    opacity: .45;
+    cursor: default;
+    transform: none;
+  }
+
+  .hint {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 9px;
+    margin-top: 8px;
+    padding: 0 2px;
+  }
+
+  .hint a {
+    color: var(--red);
+    text-decoration: none;
+    font-weight: 650;
+  }
+
+  /* ---------- Right information card ---------- */
+
+  .info-column {
+    display: grid;
+    gap: 14px;
+  }
+
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 19px;
+    box-shadow: 0 7px 25px rgba(32,40,58,.05);
+  }
+
+  .info-card.primary {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+  }
+
+  .info-card h3 {
+    font-size: 13px;
+    font-weight: 760;
+    margin-bottom: 7px;
+  }
+
+  .info-card p {
+    color: var(--ink-soft);
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .info-card.primary p { color: rgba(255,255,255,.82); }
+
+  .piece-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    margin: 15px 0 13px;
+  }
+
+  .piece-grid span {
+    height: 23px;
+    border-radius: 7px;
+  }
+
+  .piece-grid span:nth-child(1),
+  .piece-grid span:nth-child(4) { background: var(--blue); }
+
+  .piece-grid span:nth-child(2),
+  .piece-grid span:nth-child(3) { background: rgba(255,255,255,.9); }
+
+  .data-list {
+    display: grid;
+    gap: 9px;
+    margin-top: 13px;
+  }
+
+  .data-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .data-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--blue-soft);
+    color: var(--red);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .data-item span {
+    color: var(--ink-soft);
+    font-size: 10px;
+  }
+
+  .data-item strong {
+    display: block;
+    color: var(--ink);
+    font-size: 11px;
+  }
+
+  .tip {
+    border-left: 3px solid var(--blue);
+    padding-left: 11px;
+    margin-top: 13px;
+  }
+
+  .tip p { font-size: 10px; }
+
+  @media (max-width: 920px) {
+    .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
+
+    .sidebar { padding: 20px 10px; }
+
+    .brand {
+      justify-content: center;
+      padding: 2px 0 24px;
+    }
+
+    .brand-copy,
+    .nav-label,
+    .nav button span:not(.nav-icon),
+    .local-card,
+    .sidebar-footer { display: none; }
+
+    .nav button { justify-content: center; padding: 12px 8px; }
+
+    .conversation-layout { grid-template-columns: 1fr; }
+
+    .info-column { grid-template-columns: repeat(2, 1fr); }
+
+    .mosaic-decoration { display: none; }
+  }
+
+  @media (max-width: 680px) {
+    .app-shell { display: block; }
+
+    .sidebar {
+      position: static;
+      height: auto;
+      min-height: 0;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 14px;
+    }
+
+    .brand {
+      justify-content: flex-start;
+      padding: 3px 4px 10px;
+    }
+
+    .brand-copy { display: block; }
+
+    .nav-label,
+    .local-card,
+    .sidebar-footer { display: none; }
+
+    .nav {
+      display: flex;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .nav button {
+      width: auto;
+      flex: 0 0 auto;
+      justify-content: center;
+      padding: 9px 12px;
+    }
+
+    .nav button span:not(.nav-icon) { display: inline; }
+
+    .topbar {
+      padding: 0 16px;
+      height: 60px;
+      flex-basis: 60px;
+    }
+
+    .top-btn { display: none; }
+
+    .content { padding: 28px 16px 35px; }
+
+    .hero { margin-bottom: 20px; }
+
+    .hero h1 { font-size: 31px; }
+
+    .hero p { font-size: 13px; }
+
+    .info-column { grid-template-columns: 1fr; }
+
+    #messages {
+      height: 52vh;
+      min-height: 320px;
+      padding: 18px 15px;
+    }
+
+    .conversation-head { padding: 17px 16px; }
+
+    .powered { display: none; }
+
+    #input-area { padding: 13px 13px 16px; }
+
+    .msg { max-width: 88%; }
+  }
+</style>
+</head>
+
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <!-- Mosaic monogram inspired by the established brand mark -->
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-label="Mosaic logo" role="img">
+        <rect x="4" y="4" width="56" height="56" rx="17" fill="#930500"/>
+        <path d="M18 19c0-2.2 1.8-4 4-4h5c3.4 0 6.2 2.8 6.2 6.2v7.1L27 35.2c-1.4 1.4-3.7 1.4-5.1 0L18 31.3V19Z" fill="#FFF8E7"/>
+        <path d="M36.8 28.3 43 22.1c2.5-2.5 6.7-.7 6.7 2.8v9.3c0 1.1-.4 2.1-1.2 2.9l-5.2 5.2-6.5-6.5v-7.5Z" fill="#95BBEA"/>
+        <path d="M18 36.5c0-1.1.4-2.1 1.2-2.9l5.1-5.1 9 9v7.3c0 3.5-4.2 5.3-6.7 2.8L19.2 39.4c-.8-.8-1.2-1.8-1.2-2.9Z" fill="#FFF8E7"/>
+        <path d="M36.8 39.1 43 45.3c2.5 2.5 6.7.7 6.7-2.8v-5.9l-6.4-6.4-6.5 6.5v2.4Z" fill="#95BBEA"/>
+      </svg>
+
+      <div class="brand-copy">
+        <div class="brand-name">Mosaic</div>
+        <div class="brand-tagline">Una visión completa,<br>pieza por pieza.</div>
+      </div>
+    </div>
+
+    <div class="nav-label">Workspace</div>
+
+    <nav class="nav">
+      <button type="button" onclick="showDashboard()">
+        <span class="nav-icon">⌂</span><span>Inicio</span>
+      </button>
+      <button type="button" class="active">
+        <span class="nav-icon">✦</span><span>Nueva observación</span>
+      </button>
+      <button type="button" onclick="window.open('/api/customers', '_blank')">
+        <span class="nav-icon">▤</span><span>Clientes</span>
+      </button>
+      <button type="button" onclick="showDashboard()">
+        <span class="nav-icon">◇</span><span>Equipos</span>
+      </button>
+      <button type="button" onclick="showDashboard()">
+        <span class="nav-icon">⌁</span><span>Análisis</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-spacer"></div>
+
+    <div class="local-card">
+      <div class="local-title">Inteligencia local</div>
+      <p>Las observaciones se procesan en tu dispositivo mediante QVAC.</p>
+      <div class="local-status">
+        <span class="local-dot"></span>
+        Motor local activo
+      </div>
+    </div>
+
+    <div class="sidebar-footer">Mosaic v0.1.0 · Customer Installed Base Intelligence</div>
+  </aside>
+
+  <section class="main-shell">
+
+    <header class="topbar">
+      <div class="breadcrumb">Mosaic <span> / </span> <strong>Nueva observación</strong></div>
+
+      <div class="top-actions">
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          IA local · QVAC
+        </div>
+        <button class="top-btn" type="button" onclick="downloadEvidence()">Evidence</button>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <section class="hero">
+        <div>
+          <div class="eyebrow">Captura de campo</div>
+          <h1>Construye la imagen,<br>pieza por pieza.</h1>
+          <p>Describe lo que observaste durante tu visita. Mosaic convierte una conversación sencilla en información estructurada sobre la base instalada.</p>
+        </div>
+
+        <div class="mosaic-decoration" aria-hidden="true">
+          <span class="d1"></span>
+          <span class="d2"></span>
+          <span class="d3"></span>
+          <span class="d4"></span>
+        </div>
+      </section>
+
+      <section class="conversation-layout">
+
+        <div class="conversation-card">
+          <div class="conversation-head">
+            <div class="conversation-title">
+              <div class="conversation-icon">✦</div>
+              <div>
+                <h2>Nueva observación</h2>
+                <p>Cuéntale a Mosaic qué encontraste.</p>
+              </div>
+            </div>
+            <div class="powered"><strong>●</strong> Procesamiento local</div>
+          </div>
+
+          <div id="messages">
+            <div class="msg system">Describe el equipo médico que observaste. Mosaic extraerá la información relevante localmente.</div>
+          </div>
+
+          <div id="input-area">
+            <div class="input-wrap">
+              <textarea id="chat-input" rows="1" placeholder="Ej.: Estoy en Hospital DemoCare Pacific, en Panamá. Tienen dos resonadores y un tomógrafo..."></textarea>
+              <button id="send-btn" onclick="send()" aria-label="Enviar">&#9654;</button>
+            </div>
+            <div class="hint">
+              <span>Enter para enviar · Shift+Enter para nueva línea</span>
+              <a href="/api/stats" target="_blank">API</a>
+            </div>
+          </div>
+        </div>
+
+        <aside class="info-column">
+          <div class="info-card primary">
+            <h3>Una observación es una pieza.</h3>
+            <p>Al conectar las observaciones de diferentes visitas y colaboradores, Mosaic construye una visión completa de cada cliente.</p>
+
+            <div class="piece-grid" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+
+            <p>Información parcial también es información valiosa.</p>
+          </div>
+
+          <div class="info-card">
+            <h3>¿Qué puede identificar?</h3>
+            <div class="data-list">
+              <div class="data-item">
+                <div class="data-icon">C</div>
+                <span><strong>Cliente</strong>Hospital y ubicación</span>
+              </div>
+              <div class="data-item">
+                <div class="data-icon">E</div>
+                <span><strong>Equipo</strong>Modalidad y cantidad</span>
+              </div>
+              <div class="data-item">
+                <div class="data-icon">M</div>
+                <span><strong>Marca y modelo</strong>Cuando estén disponibles</span>
+              </div>
+              <div class="data-item">
+                <div class="data-icon">A</div>
+                <span><strong>Antigüedad</strong>Confirmada o estimada</span>
+              </div>
+            </div>
+
+            <div class="tip">
+              <p>Mosaic no inventa datos: lo desconocido permanece como <strong>Unknown</strong>.</p>
+            </div>
+          </div>
+        </aside>
+
+      </section>
+    </main>
+  </section>
+</div>
+
+<script>
+const messages = document.getElementById('messages');
+const input = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+let sessionId;
+let busy = false;
+
+function addMessage(text, type) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+  div.textContent = text;
+  div.style.whiteSpace = 'pre-wrap';
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+function disableOldControls() {
+  messages.querySelectorAll('button,input').forEach(el => el.disabled = true);
+}
+
+function showReply(data) {
+  addMessage(data.reply, 'ai');
+
+  if (data.observation) {
+    const lines = data.observation.equipment.map(e =>
+      e.quantity + ' × ' +
+      e.modality + ' · ' +
+      (e.brand || 'Unknown') + ' · ' +
+      (e.model || 'Unknown') +
+      (e.age
+        ? ' · Age: ' + (e.age.qualitative || [e.age.min, e.age.max].filter(v => v != null).join('–'))
+        : '')
+    );
+    addMessage(lines.join('\n'), 'system');
+  }
+
+  const pendingFollowUps = data.followUps || [];
+
+  for (const followUp of pendingFollowUps.slice(0, 1)) {
+    const box = addMessage(followUp.question, 'ai');
+
+    if (pendingFollowUps.length > 1) {
+      const remaining = document.createElement('small');
+      remaining.textContent = ` (${pendingFollowUps.length} detalles restantes)`;
+      box.appendChild(remaining);
+    }
+
+    const answer = document.createElement('input');
+    answer.placeholder = 'Escribe tu respuesta...';
+
+    const button = document.createElement('button');
+    button.textContent = 'Enviar';
+
+    const submit = () => {
+      if (answer.value.trim()) request(answer.value.trim(), followUp.question);
+    };
+
+    button.onclick = submit;
+    answer.onkeydown = e => {
+      if (e.key === 'Enter') submit();
+    };
+
+    box.append(document.createElement('br'), answer, button);
+  }
+
+  if (data.observation?.equipment.length && !data.saved) {
+    const box = addMessage('Revisa la información del equipo antes de guardarla.', 'system');
+
+    for (
+      const [label, command] of data.duplicates?.length
+        ? [['Guardar de todos modos', 'save anyway'], ['Omitir', 'skip']]
+        : [['Confirmar y guardar', 'confirm'], ['Descartar', 'skip']]
+    ) {
+      const button = document.createElement('button');
+      button.textContent = label;
+      button.onclick = () => request(command);
+      box.append(button);
+    }
+  }
+}
+
+async function request(message, question) {
+  if (busy) return;
+
+  busy = true;
+  sendBtn.disabled = true;
+
+  const activeControls = [...messages.querySelectorAll('button,input')].filter(el => !el.disabled);
+
+  disableOldControls();
+  addMessage(message, 'user');
+
+  const waiting = addMessage('Procesando localmente…', 'system');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message, question, sessionId})
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 410) sessionId = undefined;
+      throw new Error(data.error || 'Request failed');
+    }
+
+    sessionId = data.sessionId;
+    showReply(data);
+  } catch (error) {
+    activeControls.forEach(el => el.disabled = false);
+    addMessage('Error: ' + error.message, 'ai');
+  } finally {
+    waiting.remove();
+    busy = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+window.send = async function() {
+  const text = input.value.trim();
+  if (!text || busy) return;
+
+  input.value = '';
+
+  if (text === '/help') {
+    addMessage('/dashboard · /customers · /query <texto> · /evidence · /new\nDescribe una observación, responde las preguntas y luego confirma u omite.', 'system');
+    return;
+  }
+
+  if (text === '/dashboard') return showDashboard();
+  if (text === '/customers') return window.open('/api/customers', '_blank');
+  if (text === '/evidence') return downloadEvidence();
+
+  if (text.startsWith('/query ')) {
+    try {
+      const res = await fetch('/api/query?q=' + encodeURIComponent(text.slice(7)));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      addMessage(JSON.stringify(data, null, 2), 'ai');
+    } catch(error) {
+      addMessage('Error: ' + error.message, 'ai');
+    }
+    return;
+  }
+
+  await request(text);
+};
+
+window.showDashboard = () => window.open('/dashboard', '_blank');
+window.downloadEvidence = () => { window.location.href = '/api/evidence'; };
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+
+input.focus();
+</script>
+</body>
+</html>

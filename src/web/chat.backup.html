@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FieldSight — AI Chat</title>
+<style>
+  :root {
+    --bg: #0f1318;
+    --surface: #1a2028;
+    --surface2: #232c36;
+    --border: #2d3a47;
+    --text: #e7edf1;
+    --muted: #7a8a9a;
+    --accent: #58c4dd;
+    --accent-dim: #3a8a9e;
+    --ok: #5fc98a;
+    --warn: #e0a63c;
+    --danger: #e05555;
+    --user-bg: #1e3a4a;
+    --ai-bg: #1a2530;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo h1 { font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
+  .logo small { font-size: 11px; color: var(--muted); letter-spacing: 1px; display: block; margin-top: 2px; }
+  .header-actions { display: flex; gap: 8px; }
+  .header-actions button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .header-actions button:hover { color: var(--accent); border-color: var(--accent); }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 16px;
+    overflow: hidden;
+  }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .msg {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--user-bg);
+    border: 1px solid var(--accent-dim);
+  }
+  .msg.ai {
+    align-self: flex-start;
+    background: var(--ai-bg);
+    border: 1px solid var(--border);
+  }
+  .msg .meta { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .msg.ai .meta span { color: var(--accent); }
+  .msg.system {
+    align-self: center;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 4px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 20px;
+    max-width: 100%;
+  }
+  .followups {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .followups .fq {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .followups .fq:hover { border-color: var(--accent); background: var(--surface); }
+  .followups .fq .q-label { color: var(--accent); font-size: 11px; display: block; margin-bottom: 2px; }
+  .followups .fq-input {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .followups .fq-input input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .followups .fq-input button {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .equipment-card {
+    margin-top: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+  .equipment-card h4 { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .eq-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .eq-row:last-child { border-bottom: none; }
+  .eq-label { color: var(--muted); }
+  .typing { display: flex; gap: 4px; padding: 12px 16px; }
+  .typing span { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100% { transform: scale(0); } 40% { transform: scale(1); } }
+  #input-area {
+    flex-shrink: 0;
+    padding: 16px 0;
+  }
+  .input-wrap {
+    display: flex;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    transition: border-color 0.2s;
+  }
+  .input-wrap:focus-within { border-color: var(--accent); }
+  #chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 24px;
+    max-height: 120px;
+  }
+  #send-btn {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+  }
+  #send-btn:disabled { opacity: 0.4; cursor: default; }
+  .hint { text-align: center; font-size: 11px; color: var(--muted); margin-top: 8px; }
+  .hint a { color: var(--accent); text-decoration: none; }
+
+  #customer-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  #customer-modal.active { display: flex; }
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    width: 400px;
+    max-width: 90vw;
+  }
+  .modal-box h3 { margin-bottom: 16px; font-family: Georgia, serif; }
+  .modal-box label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
+  .modal-box input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .modal-box .modal-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+  .modal-box button {
+    padding: 8px 20px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent) !important; font-weight: 600; }
+  .btn-cancel { background: var(--surface2); color: var(--muted); }
+.msg button { margin: 8px 8px 0 0; padding: 8px 12px; cursor: pointer; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.msg input { margin-top: 8px; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.msg button:disabled, .msg input:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <h1>FieldSight <small>AI Chat · On-Device</small></h1>
+  </div>
+  <div class="header-actions">
+    <button onclick="showDashboard()"><span class="status-dot"></span>Dashboard</button>
+    <button onclick="downloadEvidence()">Evidence</button>
+  </div>
+</header>
+<main>
+  <div id="messages">
+    <div class="msg system">Describe medical equipment you observed at a hospital. The AI will extract structured data locally on your device.</div>
+  </div>
+  <div id="input-area">
+    <div class="input-wrap">
+      <textarea id="chat-input" rows="1" placeholder="e.g. I'm at Hospital Central in Mexico. They have a Philips Ingenia MRI, about 6 years old, and two ultrasound machines..."></textarea>
+      <button id="send-btn" onclick="send()">&#9654;</button>
+    </div>
+    <div class="hint">Press Enter to send · Shift+Enter for newline · <a href="/api/stats" target="_blank">API</a></div>
+  </div>
+</main>
+
+<script>
+const messages = document.getElementById('messages');
+const input = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+let sessionId;
+let busy = false;
+function addMessage(text, type) {
+  const div = document.createElement('div'); div.className = 'msg ' + type;
+  div.textContent = text; div.style.whiteSpace = 'pre-wrap'; messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight; return div;
+}
+function disableOldControls() {
+  messages.querySelectorAll('button,input').forEach(el => el.disabled = true);
+}
+function showReply(data) {
+  addMessage(data.reply, 'ai');
+  if (data.observation) {
+    const lines = data.observation.equipment.map(e => e.quantity + '× ' + e.modality + ' · ' + (e.brand || 'Unknown') + ' · ' + (e.model || 'Unknown') + (e.age ? ' · Age: ' + (e.age.qualitative || [e.age.min, e.age.max].filter(v => v != null).join('–')) : ''));
+    addMessage(lines.join('\n'), 'system');
+  }
+  const pendingFollowUps = data.followUps || [];
+  for (const followUp of pendingFollowUps.slice(0, 1)) {
+    const box = addMessage(followUp.question, 'ai');
+    if (pendingFollowUps.length > 1) {
+      const remaining = document.createElement('small');
+      remaining.textContent = ` (${pendingFollowUps.length} details remaining)`;
+      box.appendChild(remaining);
+    }
+    const answer = document.createElement('input'); answer.placeholder = 'Your answer...';
+    const button = document.createElement('button'); button.textContent = 'Send';
+    const submit = () => { if (answer.value.trim()) request(answer.value.trim(), followUp.question); };
+    button.onclick = submit; answer.onkeydown = e => { if (e.key === 'Enter') submit(); };
+    box.append(document.createElement('br'), answer, button);
+  }
+  if (data.observation?.equipment.length && !data.saved) {
+    const box = addMessage('Review the equipment above before saving.', 'system');
+    for (const [label, command] of data.duplicates?.length ? [['Save anyway', 'save anyway'], ['Skip', 'skip']] : [['Confirm and save', 'confirm'], ['Discard', 'skip']]) {
+      const button = document.createElement('button'); button.textContent = label; button.onclick = () => request(command); box.append(button);
+    }
+  }
+}
+async function request(message, question) {
+  if (busy) return;
+  busy = true; sendBtn.disabled = true;
+  const activeControls = [...messages.querySelectorAll('button,input')].filter(el => !el.disabled);
+  disableOldControls(); addMessage(message, 'user');
+  const waiting = addMessage('Processing locally…', 'system');
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message, question, sessionId}) });
+    const data = await res.json();
+    if (!res.ok) { if (res.status === 410) sessionId = undefined; throw new Error(data.error || 'Request failed'); }
+    sessionId = data.sessionId; showReply(data);
+  } catch (error) {
+    activeControls.forEach(el => el.disabled = false);
+    addMessage('Error: ' + error.message, 'ai');
+  } finally { waiting.remove(); busy = false; sendBtn.disabled = false; input.focus(); }
+}
+window.send = async function() {
+  const text = input.value.trim(); if (!text || busy) return; input.value = '';
+  if (text === '/help') { addMessage('/dashboard · /customers · /query <text> · /evidence · /new\nDescribe an observation, answer questions, then confirm or skip.', 'system'); return; }
+  if (text === '/dashboard') return showDashboard();
+  if (text === '/customers') return window.open('/api/customers', '_blank');
+  if (text === '/evidence') return downloadEvidence();
+  if (text.startsWith('/query ')) {
+    try { const res = await fetch('/api/query?q=' + encodeURIComponent(text.slice(7))); const data = await res.json(); if (!res.ok) throw new Error(data.error); addMessage(JSON.stringify(data, null, 2), 'ai'); }
+    catch(error) { addMessage('Error: ' + error.message, 'ai'); }
+    return;
+  }
+  await request(text);
+};
+window.showDashboard = () => window.open('/dashboard', '_blank');
+window.downloadEvidence = () => { window.location.href = '/api/evidence'; };
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+input.focus();
+</script>
+
+</body>
+</html>
