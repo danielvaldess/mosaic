@@ -1,0 +1,68 @@
+appId: com.mosaic.app
+productName: Mosaic
+copyright: © 2026 Mosaic
+
+directories:
+  output: release
+
+# Native deps ship N-API prebuilds (win32-x64 included), so an Electron
+# rebuild is unnecessary and would break the Node-run dev scripts.
+npmRebuild: false
+
+# The QVAC worker is spawned by the external `bare` runtime, which cannot
+# read inside an asar archive; ship the app as plain files.
+asar: false
+
+files:
+  - dist/**
+  - package.json
+  - node_modules/**/*
+  - "!**/*.map"
+  # The QVAC addons ship prebuilds for every platform; this installer is
+  # win32-x64 only, so drop the rest (several GB).
+  - "!**/prebuilds/android-*/**"
+  - "!**/prebuilds/ios-*/**"
+  - "!**/prebuilds/darwin-*/**"
+  - "!**/prebuilds/linux-*/**"
+  - "!**/prebuilds/linuxmusl-*/**"
+  - "!**/prebuilds/win32-arm64/**"
+  - "!**/prebuilds/win32-ia32/**"
+
+extraResources:
+  - from: data/dummy_installed_base.json
+    to: dummy_installed_base.json
+  - from: qvac.config.json
+    to: qvac.config.json
+  - from: build/icon.ico
+    to: icon.ico
+  # Bundled models for the offline installer (empty unless `npm run model:fetch`).
+  - from: assets/models
+    to: models
+    filter: ['*.gguf']
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  # Code signing is picked up automatically from CI env vars:
+  #   CSC_LINK / CSC_KEY_PASSWORD  (base64 .pfx or path, injected from secrets)
+  # Without a certificate the build stays unsigned and SmartScreen may warn.
+
+publish:
+  provider: github
+  owner: danielvaldess
+  repo: mosaic
+  releaseType: draft
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Mosaic
+  uninstallDisplayName: Mosaic
+  deleteAppDataOnUninstall: false
+  artifactName: ${productName}-Setup-${version}.${ext}

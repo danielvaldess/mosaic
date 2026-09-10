@@ -70,28 +70,39 @@ const MODALITY_SYNONYMS: Record<string, string> = {
   'patient monitoring': 'Patient Monitoring',
   'image guided therapy': 'Image Guided Therapy',
   resonancia: 'MR',
+  resonador: 'MR',
   tomografia: 'CT',
+  tomografo: 'CT',
+  tac: 'CT',
+  ecografia: 'Ultrasound',
   ecografo: 'Ultrasound',
+}
+
+function stripAccents(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 export function normalizeModality(raw?: string): string | undefined {
   if (!raw) return undefined
   const key = raw.toLowerCase().trim()
   if (MODALITY_SYNONYMS[key]) return MODALITY_SYNONYMS[key]
+  const ascii = stripAccents(key)
+  if (MODALITY_SYNONYMS[ascii]) return MODALITY_SYNONYMS[ascii]
   // Handle composite outputs like "MRI/Magnetic Resonance" or "CT scanner (2)".
   for (const sep of ['/', ',', '(', ';']) {
-    const first = key.split(sep)[0]?.trim()
+    const first = ascii.split(sep)[0]?.trim()
     if (first && MODALITY_SYNONYMS[first]) return MODALITY_SYNONYMS[first]
   }
   // Fuzzy containment: pick the first known modality present in the string.
   for (const [alias, canonical] of Object.entries(MODALITY_SYNONYMS)) {
-    if (mentions(key, alias)) return canonical
+    if (mentions(ascii, alias)) return canonical
   }
   return undefined
 }
 
 function mentions(text: string, alias: string): boolean {
-  return new RegExp('(^|[^a-z0-9])' + alias + '($|[^a-z0-9])', 'i').test(text)
+  const escaped = stripAccents(alias).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp('(^|[^a-z0-9])' + escaped + '(?:e?s)?($|[^a-z0-9])', 'i').test(text)
 }
 
 /**
@@ -99,9 +110,10 @@ function mentions(text: string, alias: string): boolean {
  * actually mentions it (via any synonym). Small local models sometimes invent
  * equipment that was never observed (e.g. adding an X-Ray to a report that
  * only mentioned MR + CT). True positives survive; invented rows are dropped.
+ * Matching is accent-insensitive so "resonadores magneticos" keeps MR.
  */
 export function filterModalitiesMentioned(rawInput: string, extraction: Extraction): Extraction {
-  const q = rawInput.toLowerCase()
+  const q = stripAccents(rawInput.toLowerCase())
   const mentioned = new Set<string>()
   for (const [alias, canonical] of Object.entries(MODALITY_SYNONYMS)) {
     if (mentions(q, alias)) mentioned.add(canonical)
@@ -111,7 +123,7 @@ export function filterModalitiesMentioned(rawInput: string, extraction: Extracti
     if (!canonical) return false
     // Trust explicitly-named modalities even without exact synonym match, and
     // keep rows whose modality is directly present in the input.
-    return mentioned.has(canonical) || mentions(q, canonical.toLowerCase())
+    return mentioned.has(canonical) || mentions(q, canonical)
   })
   return { ...extraction, equipment: kept }
 }

@@ -37,7 +37,7 @@ createServer((req, res) => {
   }
   json(res, { error: 'not found' }, 404)
 }).listen(PORT, '127.0.0.1', () => {
-  console.log(`FieldSight dashboard → http://localhost:${PORT}`)
+  console.log(`Mosaic dashboard → http://localhost:${PORT}`)
 })
 
 export default {} as unknown

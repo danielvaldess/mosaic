@@ -1,10 +1,12 @@
 {
-  "name": "fieldsight",
+  "name": "mosaic",
   "version": "0.1.0",
-  "description": "FieldSight - Customer Installed Base Intelligence. Captura conversacional de observaciones de campo con IA local (QVAC).",
+  "description": "Mosaic - Customer Installed Base Intelligence. Captura conversacional de observaciones de campo con IA local (QVAC).",
   "type": "module",
   "private": true,
   "license": "Apache-2.0",
+  "author": "Mosaic",
+  "main": "dist/electron/main.js",
   "engines": {
     "node": ">=22.17"
   },
@@ -15,7 +17,14 @@
     "web": "tsx src/web-server.ts",
     "seed": "tsx src/store/seed.ts",
     "test": "vitest run",
+    "test:e2e": "npm run build && playwright test",
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
+    "model:fetch": "node scripts/fetch-model.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --win --dir",
+    "desktop:dist": "npm run build && node scripts/build-desktop.mjs",
+    "desktop:dist:offline": "npm run build && node scripts/build-desktop.mjs --offline",
     "security:secrets": "trufflehog filesystem . --fail",
     "security:sast": "semgrep --config p/security-audit src --error",
     "security:sca": "npm audit"
@@ -23,17 +32,23 @@
   "dependencies": {
     "@qvac/sdk": "^0.19.0",
     "better-sqlite3": "^13.0.3",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^24.0.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
     "tsx": "^4.23.13",
     "typescript": "^5.8.0",
     "vitest": "^5.0.0"
   },
   "allowScripts": {
     "esbuild": true,
-    "better-sqlite3": true
+    "better-sqlite3": true,
+    "electron": true
   }
 }

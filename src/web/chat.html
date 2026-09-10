@@ -1014,6 +1014,29 @@ let busy = false;
 let selectedLang = null;
 
 loadSuggestions();
+loadSettings();
+
+async function loadSettings() {
+  let settings = null;
+  try {
+    const response = await fetch('/api/settings');
+    if (response.ok) settings = await response.json();
+  } catch {}
+  if (!settings || !settings.onboardingComplete) return;
+  selectedLang = settings.language === 'en' ? 'en' : 'es';
+  const prompt = document.getElementById('lang-prompt');
+  if (prompt) prompt.remove();
+  const intro = messages.querySelector('.msg.system');
+  if (intro) intro.remove();
+  input.placeholder = selectedLang === 'es'
+    ? 'Ej.: Estoy en Hospital DemoCare Pacific, en Panamá. Tienen dos resonadores y un tomógrafo...'
+    : 'e.g. I\'m at Hospital DemoCare Pacific in Panama. They have two MRI systems and a CT scanner...';
+  const name = settings.name ? ', ' + settings.name : '';
+  addMessage(selectedLang === 'es'
+    ? '¡Hola' + name + '! Soy Mosaic. Cuéntame qué equipos médicos viste y los estructuro para ti.'
+    : 'Hi' + name + '! I\'m Mosaic. Tell me which medical equipment you saw and I\'ll structure it for you.', 'ai');
+  input.focus();
+}
 
 function selectLanguage(lang) {
   selectedLang = lang;

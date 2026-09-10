@@ -15,8 +15,8 @@
 ## Paso 1 — Clonar el repo y entrar a la rama
 
 ```powershell
-git clone https://github.com/danielvaldess/fieldsight.git
-cd fieldsight
+git clone https://github.com/danielvaldess/mosaic.git
+cd mosaic
 git checkout feat/conversational-p2p
 ```
 
@@ -57,7 +57,7 @@ qvac serve --openai --no-default -c config/qvac.serve.json -H $ip -p 11437 --api
 > no la lee este CLI). Y usa `-H <tu-IP-local>`, no `0.0.0.0`.
 
 **Primera vez**: descargará el modelo Qwen3-4B (~2.5 GB) y lo precargará en la
-GPU. Tardará unos minutos. Verás algo como `Preloading 1 model(s): fieldsight-llm`.
+GPU. Tardará unos minutos. Verás algo como `Preloading 1 model(s): mosaic-llm`.
 
 **Verificar que funciona** (en otra terminal):
 
@@ -65,20 +65,20 @@ GPU. Tardará unos minutos. Verás algo como `Preloading 1 model(s): fieldsight-
 Invoke-RestMethod -Headers @{ Authorization = "Bearer $key" } http://localhost:11437/v1/models
 ```
 
-Debe responder con una lista que incluye `fieldsight-llm` (state `ready`).
+Debe responder con una lista que incluye `mosaic-llm` (state `ready`).
 
 ## Paso 5 — Compartir la dirección a Daniel
 
 Dile a Daniel la **IP local** y la **clave**:
 
-> La URL es `http://<IP>:11437/v1`, el modelo es `fieldsight-llm` y la clave es `<key>`.
+> La URL es `http://<IP>:11437/v1`, el modelo es `mosaic-llm` y la clave es `<key>`.
 
 Daniel pondrá esto en su máquina:
 
 ```powershell
-$env:FIELDSIGHT_LLM_URL = "http://<IP>:11437/v1"
-$env:FIELDSIGHT_LLM_MODEL = "fieldsight-llm"
-$env:FIELDSIGHT_LLM_API_KEY = "<key>"
+$env:MOSAIC_LLM_URL = "http://<IP>:11437/v1"
+$env:MOSAIC_LLM_MODEL = "mosaic-llm"
+$env:MOSAIC_LLM_API_KEY = "<key>"
 npm run cli
 ```
 
@@ -101,5 +101,5 @@ npm run cli
 | `vulkan` no encontrado / error de GPU | Actualiza drivers NVIDIA desde GeForce Experience |
 | El modelo no carga | Verifica 5 GB libres; borra caché `~\.qvac\models` y reintenta |
 | Daniel no conecta | Verifica IP, firewall, que uses `-c config/qvac.serve.json` y que ambos estén en la misma red/Tailscale |
-| Error de autenticación (401) | Confirma que Daniel usa la misma clave en `FIELDSIGHT_LLM_API_KEY` |
+| Error de autenticación (401) | Confirma que Daniel usa la misma clave en `MOSAIC_LLM_API_KEY` |
 | El comando de verificación no responde | Asegúrate de que la variable `$key` siga definida en esa terminal; si el server aún carga el modelo, espera y reintenta |

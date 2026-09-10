@@ -6,6 +6,7 @@ import { Conversation } from './agent/conversation.js'
 import type { Extraction } from './types.js'
 import { allCustomers, getChatSuggestions } from './store/db.js'
 import { customer360, globalStats, queryInstalledBase } from './insights/insights.js'
+import { loadSettings, saveSettings, type AppSettings } from './settings.js'
 
 const requestSchema = z.object({
   message: z.string().trim().min(1).max(8000),
@@ -13,9 +14,22 @@ const requestSchema = z.object({
   question: z.string().max(1000).optional(),
   lang: z.enum(['en', 'es', 'pt', 'fr', 'de', 'it', 'nl']).optional(),
 })
+
+const settingsSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  language: z.enum(['en', 'es']),
+  location: z.object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    accuracy: z.number().nonnegative().optional(),
+    city: z.string().trim().max(120).optional(),
+    country: z.string().trim().max(120).optional(),
+  }).optional(),
+})
+
 class HttpError extends Error { constructor(public status: number, message: string) { super(message) } }
 
-async function readBody(req: IncomingMessage) {
+async function readBody<T>(req: IncomingMessage, schema: z.ZodType<T>, errorMessage: string): Promise<T> {
   let size = 0
   const chunks: Buffer[] = []
   await new Promise<void>((resolve, reject) => {
@@ -28,15 +42,25 @@ async function readBody(req: IncomingMessage) {
     req.on('error', reject)
     req.on('aborted', () => reject(new HttpError(400, 'Request aborted')))
   })
-  try { return requestSchema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8'))) }
-  catch { throw new HttpError(400, 'Invalid request: provide a message and a valid sessionId when continuing.') }
+  try { return schema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8'))) }
+  catch { throw new HttpError(400, errorMessage) }
+}
+
+export interface SettingsStore {
+  get: () => AppSettings
+  save: (settings: AppSettings) => AppSettings
 }
 
 export function createApp(options: {
   db: Database.Database; extract: (text: string) => Promise<Extraction>
   chatHtml: string; dashboardHtml: string; evidence: () => string; autoSave?: boolean
+  onboardingHtml?: string
+  logoPng?: Buffer
+  settingsStore?: SettingsStore
+  ready?: () => { ready: boolean; progress: number }
 }) {
   const sessions = new Map<string, { conversation: Conversation; touched: number }>()
+  const settingsStore = options.settingsStore ?? { get: loadSettings, save: saveSettings }
   let busy = false
   function json(res: ServerResponse, data: unknown, status = 200) {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
@@ -45,9 +69,16 @@ export function createApp(options: {
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost')
+      if (req.method === 'POST' && url.pathname === '/api/settings') {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) throw new HttpError(403, 'Origin not allowed')
+        const body = await readBody(req, settingsSchema, 'Invalid settings payload.')
+        const saved = settingsStore.save({ ...settingsStore.get(), ...body, onboardingComplete: true })
+        json(res, saved)
+        return
+      }
       if (req.method === 'POST' && ['/api/chat', '/api/followup'].includes(url.pathname)) {
         if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) throw new HttpError(403, 'Origin not allowed')
-        const body = await readBody(req)
+        const body = await readBody(req, requestSchema, 'Invalid request: provide a message and a valid sessionId when continuing.')
         if (busy) throw new HttpError(409, 'Another observation is being processed. Please retry shortly.')
         const now = Date.now()
         for (const [id, session] of sessions) if (now - session.touched > 3600000) sessions.delete(id)
@@ -56,8 +87,12 @@ export function createApp(options: {
         const sessionId = body.sessionId ?? randomUUID()
         if (!session) {
           if (sessions.size >= 100) throw new HttpError(503, 'Too many active conversations. Retry later.')
-          const conv = new Conversation(options.db, options.extract, process.env.FIELDSIGHT_OBSERVER ?? 'Web User', options.autoSave)
-          if (body.lang) conv.setLockedLanguage(body.lang)
+          const settings = settingsStore.get()
+          const observer = settings.name ?? process.env.MOSAIC_OBSERVER ?? 'Web User'
+          const conv = new Conversation(options.db, options.extract, observer, options.autoSave)
+          // The language chosen during onboarding is locked for every conversation.
+          const locked = settings.language ?? body.lang
+          if (locked) conv.setLockedLanguage(locked)
           session = { conversation: conv, touched: now }
           sessions.set(sessionId, session)
         }
@@ -70,10 +105,18 @@ export function createApp(options: {
         return
       }
       if (req.method !== 'GET') throw new HttpError(405, 'Method not allowed')
-      if (['/', '/index.html', '/dashboard'].includes(url.pathname)) {
+      if (url.pathname === '/onboarding') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff' })
+        res.end(options.onboardingHtml ?? options.chatHtml)
+      } else if (['/', '/index.html', '/dashboard'].includes(url.pathname)) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff' })
         res.end(url.pathname === '/dashboard' ? options.dashboardHtml : options.chatHtml)
-      } else if (url.pathname === '/api/stats') json(res, globalStats(options.db))
+      } else if (url.pathname === '/mosaic-logo.png' && options.logoPng) {
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' })
+        res.end(options.logoPng)
+      } else if (url.pathname === '/api/settings') json(res, settingsStore.get())
+      else if (url.pathname === '/api/ready') json(res, options.ready?.() ?? { ready: true, progress: 100 })
+      else if (url.pathname === '/api/stats') json(res, globalStats(options.db))
       else if (url.pathname === '/api/customers') json(res, allCustomers(options.db).map(c => customer360(options.db, c)))
       else if (url.pathname === '/api/customers/refresh') json(res, globalStats(options.db).refreshCandidates)
       else if (url.pathname === '/api/suggestions') json(res, getChatSuggestions(options.db))

@@ -1,5 +1,5 @@
 /**
- * Shared extraction prompt + JSON Schema for the FieldSight extraction engine.
+ * Shared extraction prompt + JSON Schema for the Mosaic extraction engine.
  * Kept separate so both the CLI pipeline and the smoke test use the exact same
  * contract that runs on-device via QVAC.
  */
@@ -86,7 +86,7 @@ export function parseExtraction(value: unknown): import('../types.js').Extractio
   return result
 }
 
-export const SYSTEM_PROMPT = `You are FieldSight, an on-device extraction engine for Philips field-service observations.
+export const SYSTEM_PROMPT = `You are Mosaic, an on-device extraction engine for Philips field-service observations.
 
 A field engineer visited a hospital and described the medical imaging equipment they saw.
 Extract the structured facts from their message. Rules:

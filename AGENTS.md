@@ -1,6 +1,6 @@
-# AGENTS.md — FieldSight
+# AGENTS.md — Mosaic
 
-FieldSight captura observaciones de campo de ingenieros y las convierte en una base
+Mosaic captura observaciones de campo de ingenieros y las convierte en una base
 estructurada de equipos médicos instalados, con IA **100% local** vía `@qvac/sdk`.
 
 ## Regla de oro
@@ -19,13 +19,20 @@ npm test               # vitest run
 npm run cli            # asistente conversacional por terminal
 npm run web            # chat web con IA → http://localhost:4174
 npm run server         # dashboard solo-lectura → http://localhost:4173
+npm run build          # compila src/ → dist/ (tsc) + copia HTML estáticos
+npm run desktop        # app Electron en dev (requiere build previo)
+npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
+npm run model:fetch    # trae el Qwen3-1.7B a assets/models (offline installer)
+npm run desktop:dist   # instalador NSIS → release/Mosaic-Setup-<version>.exe
+npm run desktop:dist:offline # igual pero forzando model:fetch antes
+npm run test:e2e       # build + Playwright sobre la app Electron (stub LLM local)
 ```
 
 **En máquinas sin GPU / demos rápidas**, usa el modelo chico:
 
 ```bash
-FIELDSIGHT_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB)
-FIELDSIGHT_EXTRACT_MODEL=small npm run web   # misma opción para web
+MOSAIC_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB)
+MOSAIC_EXTRACT_MODEL=small npm run web   # misma opción para web
 node --import tsx scripts/smoke-extract.ts   # smoke test end-to-end
 ```
 
@@ -50,11 +57,30 @@ src/insights/insights.ts  ← Customer 360, stats globales, NL analytics determi
 src/evidence/logger.ts    ← log auditable (evidence/evidence.jsonl) + export CSV
 src/voice/transcribe.ts   ← STT Whisper on-device
 src/types.ts              ← tipos, MODALITIES, BRANDS, STATUSES, CONFIDENCES
+src/settings.ts           ← perfil persistido (nombre, idioma, ubicación) en data/settings.json
 src/cli.ts                ← asistente por terminal (entry point principal)
 src/web-server.ts         ← servidor web con chat IA (API /api/chat, /api/followup, /api/suggestions)
 src/web/chat.html         ← interfaz de chat: language selector + suggestion chips
+src/web/onboarding.html   ← primera ejecución: idioma (EN/ES), nombre y ubicación GPS
 src/server.ts             ← dashboard solo-lectura (sin IA)
 src/server/index.html     ← HTML del dashboard
+src/electron/main.ts      ← shell Electron: ventana, arranque del server, single-instance, rutas de usuario
+src/electron/security.ts  ← CSP por sesión, navigation guards, permisos denegados
+src/electron/updates.ts   ← electron-updater contra GitHub Releases (check manual por defecto)
+src/electron/logging.ts   ← electron-log (userData/logs) + captura de crashes
+src/electron/preload.cts  ← contextBridge para la pantalla de carga (IPC de progreso)
+src/electron/loading.html ← splash con progreso de descarga del modelo
+e2e/app.spec.ts           ← E2E Playwright con stub OpenAI-compatible (sin modelo real)
+playwright.config.ts      ← config E2E (workers=1 por el single-instance)
+vitest.config.ts          ← limita vitest a tests/** (excluye e2e/)
+.github/workflows/release-desktop.yml ← tag v* → instalador + draft release
+.github/workflows/desktop-e2e.yml     ← E2E en PRs que tocan src/ o el empaquetado
+electron-builder.yml      ← config NSIS (asar off, poda de prebuilds no-win32-x64)
+tsconfig.build.json       ← build de producción (solo src/ → dist/)
+scripts/copy-static.mjs   ← copia chat/dashboard/loading a dist/
+scripts/fetch-model.mjs   ← descarga/verifica el .gguf bundleado (assets/models, gitignored)
+scripts/build-desktop.mjs ← build del instalador (--offline fuerza el modelo)
+scripts/png-to-ico.mjs    ← PNG 256x256 → build/icon.ico
 scripts/smoke-extract.ts  ← smoke test con modelo real
 scripts/convert-xlsx.mjs  ← conversor XLSX→JSON (one-time)
 scripts/voice-capture.mjs ← demo de transcripción WAV
@@ -137,6 +163,50 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
   El `lang` en el request body se aplica solo al crear la sesión, no en sesiones existentes.
 - **Suggestion chips**: el input se oculta cuando hay chips. Si el usuario necesita escribir
   algo que no está en los chips, debe usar "Otro..." o esperar a que no haya chips.
+- **Empaquetado desktop**: `asar: false` es obligatorio — el worker `bare` del SDK no puede
+  leer dentro de un asar. `npmRebuild: false` porque better-sqlite3 v13 trae prebuilds N-API.
+  `files` poda `prebuilds/` de otras plataformas (android/ios/darwin/linux/win32-arm64).
+- **Rutas de usuario en desktop**: `main.ts` fija `MOSAIC_DATA_DIR`, `MOSAIC_EVIDENCE_DIR`,
+  `MOSAIC_SEED_PATH` y `QVAC_CONFIG_PATH` ANTES de importar los módulos (se leen al import).
+  La DB vive en `%APPDATA%\Mosaic\data` y el dummy se siembra en el primer arranque.
+- **Primer arranque**: `loadExtractionModel()` sube `QVAC_RPC_INIT_TIMEOUT_MS` a 180s porque el
+  escaneo de antivirus del runtime `bare` puede superar el default de 30s.
+- **Electron 44** no corre postinstall: el binario se descarga lazy al primer `require('electron')`
+  (o `node node_modules/electron/install.js`). Sin eso, `npm run desktop` falla en un clon limpio.
+- **electron-builder 26**: `publisherName` ya no existe en `win` (migrado a `signtoolOptions`);
+  el schema usa `additionalProperties: false`, cualquier clave extra rompe el build.
+- **Seguridad desktop**: CSP se inyecta por `onHeadersReceived` en `security.ts` (no tocar sin
+  probar el chat: usa `'unsafe-inline'` porque chat.html tiene `<script>`/`<style>` inline).
+  `will-navigate` solo permite el origen local; links externos solo http/https vía `shell.openExternal`.
+  Permisos del renderer denegados por defecto. DevTools solo en dev (`app.isPackaged`).
+- **Auto-update**: `electron-updater` se importa con `createRequire` porque el import ESM named
+  falla; el check es MANUAL por defecto (menú Help) para no romper la regla de red del hackathon.
+  `MOSAIC_AUTO_UPDATE=1` lo activa al arrancar. `app-update.yml` lo genera electron-builder.
+  Repo privado: requiere release publicado (no draft) y visibilidad/token para actualizar.
+- **Logs desktop**: electron-log escribe `%APPDATA%\Mosaic\logs\main.log`; el menú File/Help
+  abre la carpeta. Los crashes del renderer muestran diálogo y quedan en el log.
+- **Onboarding (primera ejecución)**: `main.ts` decide entre `/onboarding` y `/` según
+  `onboardingComplete` en `settings.json`. Pasos: idioma (solo EN/ES) → nombre → ubicación
+  (GPS con fallback manual). El idioma queda bloqueado para SIEMPRE en todas las
+  conversaciones y el nombre se usa como `observer`. El chat oculta el selector de idioma
+  y saluda por nombre.
+- **Modelo lazy**: `startMosaicServer()` ya no espera al modelo; `createInference()` corre en
+  background y `/api/ready` reporta `{ ready, progress }`. La primera inferencia espera.
+  El splash usa `mosaic-logo.png` (copiado a dist/electron y dist/web).
+- **Solo EN/ES en desktop**: el backend i18n conserva los 7 idiomas (web/CLI), pero el
+  desktop ofrece y bloquea únicamente `en`/`es`.
+- **Modelo bundleado**: `main.ts` setea `MOSAIC_MODEL_PATH` al `.gguf` de `resources/models/`
+  si existe; `loadExtractionModel()` lo carga con `modelSrc: <path>, modelType: 'llamacpp-completion'`.
+  Sin bundle cae al descriptor del registry. `assets/models/*.gguf` está gitignored.
+- **Límite NSIS**: los instaladores NSIS no pueden superar ~2 GB, por eso se bundlea el
+  Qwen3-1.7B (~1 GB) y no el 4B (~2.5 GB). El instalador offline queda en ~1.2 GB.
+- **Filtro de modalidades**: `mentions()` es accent-insensitive y acepta plurales; sin eso
+  "resonadores magneticos" / "tomografo" se descartaban (ver test en `tests/grounding.test.ts`).
+- **E2E**: Playwright lanza la app con `MOSAIC_LLM_URL` apuntando a un stub HTTP local,
+  así no descarga modelo. `MOSAIC_USER_DATA_DIR` (env) aisla la DB/evidencia del test
+  y permite modo portable.
+- **CI desktop**: release-desktop.yml se dispara con tags `v*` y publica draft en GitHub Releases;
+  desktop-e2e.yml corre Playwright en windows-latest (descarga el binario de Electron antes).
 
 ## Convenciones
 
@@ -148,16 +218,24 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 
 ## Env vars
 
-- `FIELDSIGHT_EXTRACT_MODEL=small` — Qwen3-0.6B en vez del 4B por defecto
-- `FIELDSIGHT_AUTOSAVE=1` — guarda sin confirmación
-- `FIELDSIGHT_OBSERVER` — identidad del observador (default "Field User 01")
+- `MOSAIC_EXTRACT_MODEL=small` — Qwen3-0.6B en vez del 4B por defecto
+- `MOSAIC_AUTOSAVE=1` — guarda sin confirmación
+- `MOSAIC_OBSERVER` — identidad del observador (default "Field User 01")
 - `PORT` — puerto del servidor (default: 4173 server, 4174 web)
 - `QVAC_CPU_ONLY=1` — forzar inferencia CPU sin Vulkan
+- `MOSAIC_DATA_DIR` — carpeta de la DB (default `cwd/data`; desktop → `%APPDATA%\Mosaic\data`)
+- `MOSAIC_EVIDENCE_DIR` — carpeta del log auditable (default `cwd/evidence`)
+- `MOSAIC_SEED_PATH` — JSON del dataset dummy para el seed automático
+- `MOSAIC_AUTO_UPDATE=1` — chequea updates al arrancar (default: solo manual desde el menú Help)
+- `MOSAIC_USER_DATA_DIR` — override de userData (tests E2E / modo portable)
+- `MOSAIC_MODEL_PATH` — ruta a un `.gguf` local (la setea el desktop para el modelo bundleado)
+- `QVAC_CONFIG_PATH` — ruta explícita a `qvac.config.json`
+- `QVAC_RPC_INIT_TIMEOUT_MS` — timeout del handshake del worker (default SDK 30s; `loadExtractionModel` lo sube a 180s)
 - `.env.example` documenta; nunca committear `.env`
 
 > **Decisión del equipo: inferencia FULL LOCAL.** Cada máquina corre el modelo
 > con su propio hardware (GPU vía Vulkan, o CPU como fallback automático). El
-> modo de delegación remota (FIELDSIGHT_LLM_URL/MODEL/API_KEY y
+> modo de delegación remota (MOSAIC_LLM_URL/MODEL/API_KEY y
 > `config/qvac.serve.json`) quedó implementado y verificado en
 > `src/extract/remote.ts`, pero NO es el camino actual — se mantiene solo como
 > referencia/opción futura. No introducir dependencia de un server remoto en la
@@ -167,6 +245,10 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 
 - `POST /api/chat` — conversación principal (accepts `lang` param for locked language)
 - `POST /api/followup` — follow-up directo
+- `GET/POST /api/settings` — perfil de primera ejecución (nombre, idioma, ubicación)
+- `GET /api/ready` — estado de carga del modelo `{ ready, progress }`
+- `GET /onboarding` — página de primera ejecución (solo desktop)
+- `GET /mosaic-logo.png` — logo servido para landing/onboarding
 - `GET /api/suggestions` — retorna marcas, modelos, hospitales y ciudades de la DB para chips
 - `GET /api/stats` — estadísticas globales
 - `GET /api/customers` — Customer 360 de todos los clientes

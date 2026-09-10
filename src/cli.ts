@@ -22,12 +22,12 @@ async function handleCommand(line: string, db: Database.Database): Promise<boole
   switch (cmd) {
     case 'exit':
     case 'quit':
-      console.log('👋 FieldSight closed.')
+      console.log('👋 Mosaic closed.')
       return true
     case 'help':
       console.log(
         [
-          'FieldSight — capture installed-base observations with your voice or text.',
+          'Mosaic — capture installed-base observations with your voice or text.',
           '',
           'Just type what you saw, e.g.:',
           '  "I\'m at Hospital DemoCare Pacific in Panama. They have two MR systems and one CT."',
@@ -106,7 +106,7 @@ export async function runCli(opts: CliOptions): Promise<void> {
   const conversation = new Conversation(db, inference.extract, opts.observer, opts.autoSave, opts.source)
 
   console.log('\n═══════════════════════════════════════════════')
-  console.log('  FieldSight — Customer Installed Base Intelligence')
+  console.log('  Mosaic — Customer Installed Base Intelligence')
   console.log('  Local AI by QVAC · Philips Hackathon Challenge')
   console.log('═══════════════════════════════════════════════\n')
   console.log('Describe what you observed at the customer site, or type /help.\n')
@@ -126,7 +126,7 @@ export async function runCli(opts: CliOptions): Promise<void> {
 
       try {
         const reply = await conversation.turn(line)
-        console.log('FieldSight> ' + reply.message)
+        console.log('Mosaic> ' + reply.message)
         if (reply.observation) console.table(reply.observation.equipment.map(e => ({ quantity: e.quantity, modality: e.modality, brand: e.brand, model: e.model, age: e.age?.qualitative ?? e.age?.min ?? 'Unknown' })))
         for (const f of reply.followUps) console.log('  ' + f.question)
         if (reply.observation && !reply.saved) console.log('Reply with more details, confirm, save anyway (duplicates), or skip.')
@@ -140,8 +140,8 @@ export async function runCli(opts: CliOptions): Promise<void> {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const observer = process.env.FIELDSIGHT_OBSERVER ?? 'Field User 01'
-  const autoSave = process.env.FIELDSIGHT_AUTOSAVE === '1'
+  const observer = process.env.MOSAIC_OBSERVER ?? 'Field User 01'
+  const autoSave = process.env.MOSAIC_AUTOSAVE === '1'
   runCli({ observer, autoSave, source: 'Text' }).catch((e) => {
     console.error(e)
     process.exit(1)

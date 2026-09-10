@@ -1,0 +1,38 @@
+name: Desktop E2E
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'e2e/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron-builder.yml'
+      - 'playwright.config.ts'
+      - 'tsconfig.json'
+      - '.github/workflows/desktop-e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'e2e/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron-builder.yml'
+      - 'playwright.config.ts'
+      - 'tsconfig.json'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Download Electron runtime
+        run: node node_modules/electron/install.js
+      - run: npm run test:e2e

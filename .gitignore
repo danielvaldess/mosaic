@@ -3,9 +3,17 @@ node_modules/
 
 # Build output
 dist/
+release/
+
+# Test artifacts
+test-results/
+playwright-report/
 
 # QVAC model cache (multi-GB downloads)
 .qvac/
+
+# Bundled models for the offline installer (fetched with npm run model:fetch)
+assets/models/*.gguf
 
 # Local data (DB, evidence logs) - keep sample data, ignore generated
 data/*.db

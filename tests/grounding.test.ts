@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest'
-import { groundExtraction, handleObservation, planFollowUps, buildObservation } from '../src/agent/agent.js'
+import { groundExtraction, handleObservation, planFollowUps, buildObservation, filterModalitiesMentioned } from '../src/agent/agent.js'
 import { Conversation } from '../src/agent/conversation.js'
 import { openDb, findOrCreateCustomer, allObservations } from '../src/store/db.js'
 import type { Extraction } from '../src/types.js'
@@ -37,6 +37,16 @@ it('associates adjacent English and Spanish counts with their own modality', () 
   const extraction: Extraction = {equipment: [{modality: 'MR', quantity: 1}, {modality: 'CT', quantity: 1}]}
   expect(groundExtraction('two MR systems and three CT scanners, eight years old', extraction).equipment.map(e => e.quantity)).toEqual([2, 3])
   expect(groundExtraction('dos MR y tres CT', extraction).equipment.map(e => e.quantity)).toEqual([2, 3])
+})
+
+it('keeps Spanish synonyms without accents and drops invented modalities', () => {
+  const extraction: Extraction = {equipment: [
+    {modality: 'MR', quantity: 2},
+    {modality: 'CT', quantity: 1},
+    {modality: 'X-Ray', quantity: 1},
+  ]}
+  const kept = filterModalitiesMentioned('estoy en el hospital, vi dos resonadores magneticos y un tomografo', extraction)
+  expect(kept.equipment.map(e => e.modality)).toEqual(['MR', 'CT'])
 })
 
 it('does not apply a modality total to each product model', () => {

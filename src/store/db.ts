@@ -7,8 +7,8 @@ import type {
   Observation,
 } from '../types.js'
 
-export const DATA_DIR = join(process.cwd(), 'data')
-export const DB_PATH = join(DATA_DIR, 'fieldsight.db')
+export const DATA_DIR = process.env.MOSAIC_DATA_DIR ?? join(process.cwd(), 'data')
+export const DB_PATH = join(DATA_DIR, 'mosaic.db')
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS customers (

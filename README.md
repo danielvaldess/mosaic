@@ -87,23 +87,74 @@ funcionan tal cual en cualquier equipo. En máquinas modestas, el modelo chico
 reduce la carga:
 
 ```bash
-FIELDSIGHT_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB) en vez del 4B
+MOSAIC_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB) en vez del 4B
 ```
 
 El modelo 4B (~2.5GB) se descarga del registry QVAC al primer uso y se cachea en
 `~/.qvac/models/`. La inferencia sobre los datos del cliente nunca sale de la
 máquina.
 
-> La delegación P2P a un server remoto (FIELDSIGHT_LLM_URL y
+> La delegación P2P a un server remoto (MOSAIC_LLM_URL y
 > `docs/GUIDE_GPU_SERVER.md`) quedó implementada y verificada en
 > `src/extract/remote.ts` como referencia/opción futura, pero **no** es el camino
 > de la demo actual.
+
+## App de escritorio (.exe para Windows)
+
+La demo también se distribuye como app nativa (Electron + instalador NSIS).
+Cualquier máquina Windows la instala sin Node, sin Visual Studio y sin configuración:
+
+```bash
+npm run desktop                # app en dev (ventana nativa + chat)
+npm run desktop:pack           # app empaquetada sin instalador → release/win-unpacked/
+npm run model:fetch            # descarga el modelo para empaquetarlo (offline)
+npm run desktop:dist           # instalador → release/Mosaic-Setup-<version>.exe
+npm run desktop:dist:offline   # igual, garantizando el modelo bundleado
+```
+
+- **Un solo .exe, todo incluido**: el instalador offline (**~1.2 GB**) lleva Electron,
+  Node, el runtime de IA (QVAC + bare + addons nativos) y el modelo **Qwen3-1.7B Q4_0**
+  (~1 GB). La app funciona sin internet desde el primer segundo.
+- Si `assets/models/` está vacío, `desktop:dist` produce el instalador liviano (~254 MB)
+  que descarga el modelo al primer uso.
+- NSIS tiene un tope de ~2 GB por instalador: por eso se bundlea el 1.7B (el 4B de
+  ~2.5 GB requiere un compilador NSIS especial; ver `scripts/fetch-model.mjs`).
+- Instalación por usuario (sin admin), accesos directos y desinstalador.
+- **Primera ejecución (onboarding)**: la app pregunta idioma (**solo English/Español**),
+  tu nombre y tu ubicación actual (GPS con opción manual). Se guarda en
+  `%APPDATA%\Mosaic\data\settings.json`: el idioma queda fijado para siempre en todas
+  las conversaciones con la IA y el nombre firma tus observaciones.
+- Tras el onboarding, lo primero que ves es el **chat saludándote por nombre** en tu idioma,
+  con el modelo cargando en segundo plano (barra de progreso en el splash/onboarding).
+- El modelo corre en **GPU (Vulkan) cuando está disponible** y cae a CPU automáticamente.
+- Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia, logs); el dataset dummy se
+  siembra automáticamente en el primer arranque.
+- La app es 100% local: la ventana carga el chat desde un servidor efímero en
+  `127.0.0.1` embebido en el proceso.
+- **Seguridad**: sandbox + context isolation en el renderer, CSP inyectada por sesión,
+  navegación externa bloqueada (solo http/https al navegador) y permisos denegados.
+  DevTools solo en desarrollo.
+- **Auto-update**: soporte con `electron-updater` contra GitHub Releases. El chequeo es
+  **manual** (menú Help → Check for updates) para mantener la app offline por defecto;
+  `MOSAIC_AUTO_UPDATE=1` lo activa al arrancar. Requiere un release **publicado** (no draft);
+  en repo privado el updater necesita visibilidad/token.
+- **Logs y crashes**: `%APPDATA%\Mosaic\logs\main.log` (menú File/Help abre la carpeta);
+  los crashes del renderer muestran diálogo y quedan registrados.
+- **Tests E2E**: `npm run test:e2e` lanza la app real con un stub OpenAI-compatible
+  (no descarga modelo) y valida arranque, seed y conversación.
+- **Firma de código**: lista para CI. Al configurar los secrets `WIN_CSC_LINK` /
+  `WIN_CSC_KEY_PASSWORD`, electron-builder firma el instalador automáticamente.
+  Sin certificado, SmartScreen puede pedir confirmación la primera vez.
+- **Release**: `.github/workflows/release-desktop.yml` compila y publica un draft en
+  GitHub Releases al pushear un tag `v*`; `desktop-e2e.yml` corre los E2E en PRs.
 
 ## Modelos (registry QVAC)
 
 | Uso | Modelo | Tamaño |
 |-----|--------|--------|
-| Extracción LLM | `QWEN3_4B_INST_Q4_K_M` | ~2.5 GB |
+| Extracción (bundleado en el .exe) | `QWEN3_1_7B_INST_Q4` (`Qwen3-1.7B-Q4_0.gguf`) | ~1.0 GB |
+| Extracción (CLI/web, descarga) | `QWEN3_4B_INST_Q4_K_M` | ~2.5 GB |
+| Extracción liviana | `QWEN3_600M_INST_Q4` | ~0.4 GB |
 | Voz (STT) | `WHISPER_TINY` | ~75 MB |
 
 Todos se descargan del registro distribuido QVAC al primer uso (`modelRegistry*`). También puedes apuntar `modelSrc` a cualquier `.gguf` local o URL de HuggingFace.
@@ -145,7 +196,7 @@ y usa `save anyway` para guardarlo como una observación nueva.
 
 La confirmación no vuelve a ejecutar la IA. `reviewConfirmed` indica que el usuario
 revisó el registro; los equipos con edades estimadas conservan el estado `Estimated`.
-`FIELDSIGHT_AUTOSAVE=1` permite guardar sin revisión, pero no evita la advertencia de duplicados.
+`MOSAIC_AUTOSAVE=1` permite guardar sin revisión, pero no evita la advertencia de duplicados.
 
 `npm run web` sirve el chat en `http://localhost:4174` y el panel en
 `http://localhost:4174/dashboard`. Los servidores escuchan solo en la máquina local.
@@ -154,15 +205,17 @@ reinicio del servidor ni a la recarga de la página. Las observaciones guardadas
 
 ### Windows (PowerShell)
 
-Si `npm ci` intenta compilar `better-sqlite3` con node-gyp, la versión fijada incluye
-binarios precompilados. Para instalar y comprobar la lógica sin ejecutar scripts de instalación:
+Si `npm ci` intenta compilar `better-sqlite3` con node-gyp (v13 publica prebuilds
+N-API, pero npm igual dispara el rebuild), instala **Visual Studio Build Tools 2022**
+con la carga "Desktop development with C++" y Python. Para instalar y comprobar la
+lógica sin ejecutar scripts de instalación:
 
 ```powershell
 npm ci --ignore-scripts
 npm run typecheck
 npm test
 npm run seed
-$env:FIELDSIGHT_EXTRACT_MODEL = "small"
+$env:MOSAIC_EXTRACT_MODEL = "small"
 npm run web
 ```
 
