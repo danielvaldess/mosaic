@@ -5,6 +5,10 @@ node_modules/
 dist/
 release/
 
+# Test artifacts
+test-results/
+playwright-report/
+
 # QVAC model cache (multi-GB downloads)
 .qvac/
 

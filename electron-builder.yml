@@ -41,6 +41,15 @@ win:
     - target: nsis
       arch: [x64]
   icon: build/icon.ico
+  # Code signing is picked up automatically from CI env vars:
+  #   CSC_LINK / CSC_KEY_PASSWORD  (base64 .pfx or path, injected from secrets)
+  # Without a certificate the build stays unsigned and SmartScreen may warn.
+
+publish:
+  provider: github
+  owner: danielvaldess
+  repo: mosaic
+  releaseType: draft
 
 nsis:
   oneClick: false

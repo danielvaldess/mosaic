@@ -1,10 +1,17 @@
-import { app, BrowserWindow, Menu, dialog, shell } from 'electron'
+import { app, BrowserWindow, Menu, dialog, shell, type MenuItemConstructorOptions } from 'electron'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { MosaicServer } from '../web-server.js'
+import { initLogging, log, showCrashDialog } from './logging.js'
+import { applySecurityPolicies, installNavigationGuards } from './security.js'
+import { checkForUpdates, setupAutoUpdates } from './updates.js'
 
+if (process.env['MOSAIC_USER_DATA_DIR']) {
+  app.setPath('userData', resolve(process.env['MOSAIC_USER_DATA_DIR']))
+}
 app.setName('Mosaic')
 app.setAppUserModelId('com.mosaic.app')
+app.enableSandbox()
 
 const isPackaged = app.isPackaged
 
@@ -26,11 +33,59 @@ const iconPath = isPackaged
 
 let win: BrowserWindow | null = null
 let running: MosaicServer | null = null
+let appOrigin: string | undefined
 let quitting = false
+
+const allowedOrigin = (): string | undefined => appOrigin
 
 function sendStatus(message: string, progress?: number): void {
   if (!win || win.isDestroyed()) return
   win.webContents.send('mosaic:status', { message, progress })
+}
+
+function buildMenu(): Menu {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'File',
+      submenu: [
+        { label: 'Open data folder', click: () => void shell.openPath(app.getPath('userData')) },
+        { label: 'Open logs folder', click: () => void shell.openPath(app.getPath('logs')) },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        ...(isPackaged ? [] : [{ type: 'separator' as const }, { role: 'toggleDevTools' as const }]),
+      ],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        { label: 'Check for updates', enabled: isPackaged, click: () => void checkForUpdates() },
+        { label: 'Open logs folder', click: () => void shell.openPath(app.getPath('logs')) },
+      ],
+    },
+  ]
+  return Menu.buildFromTemplate(template)
 }
 
 function createWindow(): BrowserWindow {
@@ -48,26 +103,34 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      webviewTag: false,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
     },
   })
   window.once('ready-to-show', () => window.show())
   window.on('closed', () => { win = null })
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
-    return { action: 'deny' }
+  window.webContents.on('render-process-gone', (_event, details) => {
+    log.error('Renderer process gone', details)
+    showCrashDialog(`The window process stopped unexpectedly (${details.reason}).`)
   })
-  window.webContents.on('before-input-event', (event, input) => {
-    const isDevTools = input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')
-    if (input.type === 'keyDown' && isDevTools) {
-      window.webContents.toggleDevTools()
-      event.preventDefault()
-    }
-  })
+  if (!isPackaged) {
+    window.webContents.on('before-input-event', (event, input) => {
+      const isDevTools = input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')
+      if (input.type === 'keyDown' && isDevTools) {
+        window.webContents.toggleDevTools()
+        event.preventDefault()
+      }
+    })
+  }
   return window
 }
 
 async function bootstrap(): Promise<void> {
-  Menu.setApplicationMenu(null)
+  Menu.setApplicationMenu(buildMenu())
+  applySecurityPolicies()
+  installNavigationGuards(allowedOrigin)
+
   win = createWindow()
   await win.loadFile(join(import.meta.dirname, 'loading.html'))
 
@@ -75,7 +138,7 @@ async function bootstrap(): Promise<void> {
     const { seedFromXlsx } = await import('../store/seed.js')
     seedFromXlsx()
   } catch (error) {
-    console.error('Seed skipped:', error)
+    log.warn('Seed skipped', error)
   }
 
   const { setModelProgressListener } = await import('../extract/extractor.js')
@@ -87,10 +150,18 @@ async function bootstrap(): Promise<void> {
   const { startMosaicServer } = await import('../web-server.js')
   const server = await startMosaicServer({ port: Number(process.env['PORT'] ?? 0) })
   running = server
+  appOrigin = `http://127.0.0.1:${server.port}`
   setModelProgressListener(undefined)
   if (!win || win.isDestroyed()) return
-  await win.loadURL(`http://127.0.0.1:${server.port}/`)
+  await win.loadURL(`${appOrigin}/`)
+  setupAutoUpdates(() => win)
 }
+
+app.on('child-process-gone', (_event, details) => {
+  log.error('Child process gone', details)
+})
+
+initLogging()
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -113,7 +184,7 @@ if (!gotLock) {
   app.whenReady()
     .then(bootstrap)
     .catch((error: unknown) => {
-      console.error(error)
+      log.error('Fatal startup error', error)
       dialog.showErrorBox('Mosaic', error instanceof Error ? error.message : String(error))
       app.quit()
     })

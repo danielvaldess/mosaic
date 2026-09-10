@@ -112,12 +112,26 @@ npm run desktop:dist   # instalador → release/Mosaic-Setup-<version>.exe
 
 - Instalación por usuario (sin admin), accesos directos y desinstalador.
 - La primera vez descarga solo Qwen3-0.6B (~382 MB) con barra de progreso.
-- Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia); el dataset dummy se
+- Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia, logs); el dataset dummy se
   siembra automáticamente en el primer arranque.
 - La app es 100% local: la ventana carga el chat desde un servidor efímero en
   `127.0.0.1` embebido en el proceso.
-- El instalador no está firmado digitalmente (sin certificado): Windows SmartScreen
-  puede pedir confirmación la primera vez.
+- **Seguridad**: sandbox + context isolation en el renderer, CSP inyectada por sesión,
+  navegación externa bloqueada (solo http/https al navegador) y permisos denegados.
+  DevTools solo en desarrollo.
+- **Auto-update**: soporte con `electron-updater` contra GitHub Releases. El chequeo es
+  **manual** (menú Help → Check for updates) para mantener la app offline por defecto;
+  `MOSAIC_AUTO_UPDATE=1` lo activa al arrancar. Requiere un release **publicado** (no draft);
+  en repo privado el updater necesita visibilidad/token.
+- **Logs y crashes**: `%APPDATA%\Mosaic\logs\main.log` (menú File/Help abre la carpeta);
+  los crashes del renderer muestran diálogo y quedan registrados.
+- **Tests E2E**: `npm run test:e2e` lanza la app real con un stub OpenAI-compatible
+  (no descarga modelo) y valida arranque, seed y conversación.
+- **Firma de código**: lista para CI. Al configurar los secrets `WIN_CSC_LINK` /
+  `WIN_CSC_KEY_PASSWORD`, electron-builder firma el instalador automáticamente.
+  Sin certificado, SmartScreen puede pedir confirmación la primera vez.
+- **Release**: `.github/workflows/release-desktop.yml` compila y publica un draft en
+  GitHub Releases al pushear un tag `v*`; `desktop-e2e.yml` corre los E2E en PRs.
 
 ## Modelos (registry QVAC)
 

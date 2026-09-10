@@ -23,6 +23,7 @@ npm run build          # compila src/ → dist/ (tsc) + copia HTML estáticos
 npm run desktop        # app Electron en dev (requiere build previo)
 npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
 npm run desktop:dist   # instalador NSIS → release/Mosaic-Setup-<version>.exe
+npm run test:e2e       # build + Playwright sobre la app Electron (stub LLM local)
 ```
 
 **En máquinas sin GPU / demos rápidas**, usa el modelo chico:
@@ -60,8 +61,16 @@ src/web/chat.html         ← interfaz de chat: language selector + suggestion c
 src/server.ts             ← dashboard solo-lectura (sin IA)
 src/server/index.html     ← HTML del dashboard
 src/electron/main.ts      ← shell Electron: ventana, arranque del server, single-instance, rutas de usuario
+src/electron/security.ts  ← CSP por sesión, navigation guards, permisos denegados
+src/electron/updates.ts   ← electron-updater contra GitHub Releases (check manual por defecto)
+src/electron/logging.ts   ← electron-log (userData/logs) + captura de crashes
 src/electron/preload.cts  ← contextBridge para la pantalla de carga (IPC de progreso)
 src/electron/loading.html ← splash con progreso de descarga del modelo
+e2e/app.spec.ts           ← E2E Playwright con stub OpenAI-compatible (sin modelo real)
+playwright.config.ts      ← config E2E (workers=1 por el single-instance)
+vitest.config.ts          ← limita vitest a tests/** (excluye e2e/)
+.github/workflows/release-desktop.yml ← tag v* → instalador + draft release
+.github/workflows/desktop-e2e.yml     ← E2E en PRs que tocan src/ o el empaquetado
 electron-builder.yml      ← config NSIS (asar off, poda de prebuilds no-win32-x64)
 tsconfig.build.json       ← build de producción (solo src/ → dist/)
 scripts/copy-static.mjs   ← copia chat/dashboard/loading a dist/
@@ -160,6 +169,21 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
   (o `node node_modules/electron/install.js`). Sin eso, `npm run desktop` falla en un clon limpio.
 - **electron-builder 26**: `publisherName` ya no existe en `win` (migrado a `signtoolOptions`);
   el schema usa `additionalProperties: false`, cualquier clave extra rompe el build.
+- **Seguridad desktop**: CSP se inyecta por `onHeadersReceived` en `security.ts` (no tocar sin
+  probar el chat: usa `'unsafe-inline'` porque chat.html tiene `<script>`/`<style>` inline).
+  `will-navigate` solo permite el origen local; links externos solo http/https vía `shell.openExternal`.
+  Permisos del renderer denegados por defecto. DevTools solo en dev (`app.isPackaged`).
+- **Auto-update**: `electron-updater` se importa con `createRequire` porque el import ESM named
+  falla; el check es MANUAL por defecto (menú Help) para no romper la regla de red del hackathon.
+  `MOSAIC_AUTO_UPDATE=1` lo activa al arrancar. `app-update.yml` lo genera electron-builder.
+  Repo privado: requiere release publicado (no draft) y visibilidad/token para actualizar.
+- **Logs desktop**: electron-log escribe `%APPDATA%\Mosaic\logs\main.log`; el menú File/Help
+  abre la carpeta. Los crashes del renderer muestran diálogo y quedan en el log.
+- **E2E**: Playwright lanza la app con `MOSAIC_LLM_URL` apuntando a un stub HTTP local,
+  así no descarga modelo. `MOSAIC_USER_DATA_DIR` (env) aisla la DB/evidencia del test
+  y permite modo portable.
+- **CI desktop**: release-desktop.yml se dispara con tags `v*` y publica draft en GitHub Releases;
+  desktop-e2e.yml corre Playwright en windows-latest (descarga el binario de Electron antes).
 
 ## Convenciones
 
@@ -179,6 +203,8 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - `MOSAIC_DATA_DIR` — carpeta de la DB (default `cwd/data`; desktop → `%APPDATA%\Mosaic\data`)
 - `MOSAIC_EVIDENCE_DIR` — carpeta del log auditable (default `cwd/evidence`)
 - `MOSAIC_SEED_PATH` — JSON del dataset dummy para el seed automático
+- `MOSAIC_AUTO_UPDATE=1` — chequea updates al arrancar (default: solo manual desde el menú Help)
+- `MOSAIC_USER_DATA_DIR` — override de userData (tests E2E / modo portable)
 - `QVAC_CONFIG_PATH` — ruta explícita a `qvac.config.json`
 - `QVAC_RPC_INIT_TIMEOUT_MS` — timeout del handshake del worker (default SDK 30s; `loadExtractionModel` lo sube a 180s)
 - `.env.example` documenta; nunca committear `.env`
