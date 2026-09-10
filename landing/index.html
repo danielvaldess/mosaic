@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Mosaic transforma observaciones de campo en inteligencia accionable sobre la base instalada de equipos médicos.">
+    <title>Mosaic — Una visión completa, pieza por pieza.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#mosaic">Saltar al contenido</a>
+    <header class="site-header"><nav class="nav container" aria-label="Navegación principal">
+      <a href="#mosaic" class="brand" aria-label="Mosaic, inicio"><img src="assets/logo/mosaic-logo.png" alt="Isologo de Mosaic"><span>MOSAIC</span></a>
+      <button class="menu-toggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav-menu">☰</button>
+      <div id="nav-menu" class="nav-links"><a href="#mosaic">Mosaic</a><a href="#funcionamiento">Cómo funciona</a><a href="#equipo">Equipo</a><a href="#recursos">Más</a></div>
+    </nav></header>
+    <main>
+      <section id="mosaic" class="hero section"><div class="container hero-grid">
+        <div class="reveal"><p class="eyebrow">Customer Installed Base Intelligence</p><h1>Una visión completa, pieza por pieza.</h1><p class="intro">Mosaic conecta observaciones de campo para construir una imagen clara, estructurada y accionable de los equipos médicos instalados.</p><a class="button" href="#que-es">Conoce Mosaic</a></div>
+        <div class="logo-card reveal"><img src="assets/logo/mosaic-logo.png" alt="Isologo de Mosaic"><div><strong>Mosaic</strong><span>Inteligencia de base instalada</span></div></div>
+      </div></section>
+      <section id="que-es" class="section cream"><div class="container split"><div class="reveal"><p class="eyebrow">Mosaic · Qué es</p><h2>La información de campo se convierte en una base instalada confiable.</h2><p>Mosaic es una solución que transforma las observaciones realizadas durante visitas a hospitales en información estructurada sobre sus equipos médicos.</p></div><aside class="quote reveal">“Cada observación es una pieza. Al conectarlas, Mosaic construye una visión completa de cada cliente.”</aside></div></section>
+      <section id="problematica" class="section"><div class="container"><p class="eyebrow">La problemática</p><h2>Información valiosa que queda dispersa.</h2><div class="problem-grid"><div class="scatter reveal"><span>Notas personales</span><span>Conversaciones</span><span>Memoria</span><span>Datos incompletos</span><span>Sistemas desconectados</span></div><div class="problem-copy reveal"><p>Sin una fuente consolidada es difícil saber qué equipos están instalados, dónde se encuentran, qué información está confirmada o qué debe verificarse.</p><p>También se pierden señales tempranas de renovación y oportunidades comerciales.</p></div></div></div></section>
+      <section id="solucion" class="section blue-section"><div class="container"><p class="eyebrow">La solución</p><h2>Mosaic entiende la observación, no obliga a llenar formularios complejos.</h2><div class="cards four"><article class="reveal"><b>Interpreta</b><p>Comprende la información escrita por el trabajador de campo.</p></article><article class="reveal"><b>Extrae</b><p>Organiza los datos importantes de cada observación.</p></article><article class="reveal"><b>Pregunta</b><p>Solicita datos relevantes que hacen falta.</p></article><article class="reveal"><b>Consolida</b><p>Detecta posibles duplicados y construye una vista por cliente.</p></article></div></div></section>
+      <section id="detecta" class="section cream"><div class="container split"><div><p class="eyebrow">Qué detecta</p><h2>Información estructurada, sin inventar datos.</h2><p>Mosaic identifica la información proporcionada y distingue entre datos confirmados, reportados, estimados o desconocidos.</p></div><div class="data-card reveal"><div class="tags"><span>Cliente</span><span>Ciudad</span><span>País</span><span>Modalidad</span><span>Cantidad</span><span>Marca</span><span>Modelo</span><span>Antigüedad</span></div><hr><div class="status"><b>Confirmed</b><b>Reported</b><b>Estimated</b><b>Unknown</b></div></div></div></section>
+      <section id="funcionamiento" class="section"><div class="container"><p class="eyebrow">Cómo funciona</p><h2>De una visita a información accionable.</h2><div class="flow reveal"><article><span>01</span><b>Observación</b><p>El usuario describe lo que ve en lenguaje natural.</p></article><i>→</i><article><span>02</span><b>QVAC + Qwen3</b><p>La IA local procesa la observación.</p></article><i>→</i><article><span>03</span><b>Extracción</b><p>Los datos se convierten en campos estructurados.</p></article><i>→</i><article><span>04</span><b>Validación</b><p>Mosaic pregunta si falta información importante.</p></article><i>→</i><article><span>05</span><b>Consolidación</b><p>La observación se revisa y se guarda.</p></article></div></div></section>
+      <section id="tecnologia" class="section dark"><div class="container split"><div><p class="eyebrow">Tecnología y detección</p><h2>La inferencia se ejecuta localmente mediante QVAC.</h2><p>Mosaic usa Qwen3 para interpretar observaciones y devolver una extracción estructurada. No reemplaza este flujo con proveedores de IA en la nube.</p><p>Cuando falta información valiosa —por ejemplo, el modelo de un resonador— Mosaic realiza una pregunta de seguimiento antes de consolidar el dato.</p></div><div class="architecture reveal"><span>Usuario</span><i>↓</i><span>Mosaic Web App</span><i>↓</i><span>Node.js / TypeScript</span><i>↓</i><span>QVAC SDK</span><i>↓</i><span>Qwen3</span><i>↓</i><span>Inferencia local</span><i>↓</i><span>Datos estructurados</span><i>↓</i><span>SQLite</span></div></div></section>
+      <section id="equipo" class="section blue-section"><div class="container"><p class="eyebrow">Equipo</p><h2>Las personas detrás de Mosaic.</h2><div class="team-grid">
+        <article class="member reveal"><div class="initial">A</div><h3>Abigail Claroz</h3><p>UX/UI &amp; Frontend Developer</p><a data-linkedin="ABIGAIL_LINKEDIN" href="#">LinkedIn ↗</a></article>
+        <article class="member reveal"><div class="initial">D</div><h3>Daniel Valdés</h3><p>DevSecOps Engineer</p><a data-linkedin="DANIEL_LINKEDIN" href="#">LinkedIn ↗</a></article>
+        <article class="member reveal"><div class="initial">J</div><h3>Jose Miranda</h3><p>Backend &amp; Data Analyst</p><a data-linkedin="JOSE_LINKEDIN" href="#">LinkedIn ↗</a></article>
+        <article class="member reveal"><div class="initial">L</div><h3>Lizmarie Camacho</h3><p>Quality Assurance (QA)</p><a data-linkedin="LIZMARIE_LINKEDIN" href="#">LinkedIn ↗</a></article>
+      </div></div></section>
+      <section id="recursos" class="section cream"><div class="container"><p class="eyebrow">Más Mosaic</p><h2>Explora el proyecto.</h2><div class="resource-grid"><article class="resource reveal"><span>▶</span><h3>Video</h3><p>Espacio preparado para el video de presentación o demo.</p><a id="video-link" href="#">Video próximamente</a></article><article class="resource reveal"><span>⌘</span><h3>Repositorio</h3><p>Consulta el código y la evolución de Mosaic.</p><a id="repo-link" href="#">Repositorio próximamente</a></article><article class="resource qr reveal"><div id="qr-placeholder" aria-label="Espacio reservado para código QR">QR</div><h3>Prueba la app</h3><p>Reemplaza este espacio con el QR que dirija a la aplicación.</p></article></div></div></section>
+    </main>
+    <footer><div class="container"><img src="assets/logo/mosaic-logo.png" alt="Isologo de Mosaic"><p>Una visión completa, pieza por pieza.</p></div></footer><script src="script.js"></script>
+  </body>
+</html>
