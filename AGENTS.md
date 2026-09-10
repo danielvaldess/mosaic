@@ -39,8 +39,8 @@ Sin `small`, se descarga Qwen3-4B (~2.5GB) — no lo lances por accidente en CI.
 ```
 src/extract/prompt.ts     ← prompt + JSON Schema. ÚNICA fuente del contrato LLM.
 src/extract/extractor.ts  ← loadModel + completion() con responseFormat json_schema
-src/extract/remote.ts     ← P2P remote inference via QVAC HTTP server
-src/extract/provider.ts   ← Unified inference entrypoint (local vs remote)
+src/extract/remote.ts     ← remote inference (opcional, no usado en la demo full-local)
+src/extract/provider.ts   ← entrypoint unificado (default: local on-device)
 src/agent/agent.ts        ← follow-ups, duplicados, estados, guardado, anti-alucinación
 src/agent/conversation.ts ← turn handling, language locking, follow-up answer application
 src/agent/i18n.ts         ← 7-language i18n: detection, modality labels, plurals, follow-ups
@@ -149,15 +149,19 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 ## Env vars
 
 - `FIELDSIGHT_EXTRACT_MODEL=small` — Qwen3-0.6B en vez del 4B por defecto
-- `FIELDSIGHT_LLM_URL=http://<ip>:11437/v1` — **delega** la inferencia a un peer con GPU
-  (`qvac serve --openai`, ver `docs/GUIDE_GPU_SERVER.md`). Debe terminar en `/v1`.
-- `FIELDSIGHT_LLM_MODEL` — alias del modelo en el server remoto (default `fieldsight-llm`)
-- `FIELDSIGHT_LLM_API_KEY` — clave Bearer requerida cuando el peer se expone a la LAN
 - `FIELDSIGHT_AUTOSAVE=1` — guarda sin confirmación
 - `FIELDSIGHT_OBSERVER` — identidad del observador (default "Field User 01")
 - `PORT` — puerto del servidor (default: 4173 server, 4174 web)
 - `QVAC_CPU_ONLY=1` — forzar inferencia CPU sin Vulkan
 - `.env.example` documenta; nunca committear `.env`
+
+> **Decisión del equipo: inferencia FULL LOCAL.** Cada máquina corre el modelo
+> con su propio hardware (GPU vía Vulkan, o CPU como fallback automático). El
+> modo de delegación remota (FIELDSIGHT_LLM_URL/MODEL/API_KEY y
+> `config/qvac.serve.json`) quedó implementado y verificado en
+> `src/extract/remote.ts`, pero NO es el camino actual — se mantiene solo como
+> referencia/opción futura. No introducir dependencia de un server remoto en la
+> demo: la app debe funcionar sin configuración extra en cualquier máquina.
 
 ## API Endpoints
 

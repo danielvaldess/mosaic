@@ -78,27 +78,26 @@ node scripts/voice-capture.mjs nota.wav   # genera nota.txt con Whisper local
 # luego pega el texto en el CLI, o usa /voice si lo implementas
 ```
 
-### Inferencia delegada (P2P / GPU remota)
+### Inferencia (100% local)
 
-Sin GPU local, FieldSight puede delegar la inferencia a la máquina de un
-compañero con GPU (RTX 3050, etc.) que corra el servidor QVAC. El lado servidor
-se lanza con `qvac serve --openai --no-default -c config/qvac.serve.json
--H <IP> -p 11437 --api-key <key>` — ver `docs/GUIDE_GPU_SERVER.md` para la guía
-paso a paso (usa `-c`, no `QVAC_CONFIG_PATH`).
-
-Lado cliente (tu máquina sin GPU):
+**Decisión del equipo: full local.** Cada máquina corre el modelo con su propio
+hardware — GPU vía Vulkan si la hay, o CPU como fallback automático. No se
+necesita configuración extra ni un servidor remoto: `npm run cli` y `npm run web`
+funcionan tal cual en cualquier equipo. En máquinas modestas, el modelo chico
+reduce la carga:
 
 ```bash
-FIELDSIGHT_LLM_URL=http://<peer-ip>:11437/v1 \
-FIELDSIGHT_LLM_MODEL=fieldsight-llm \
-FIELDSIGHT_LLM_API_KEY=<key> \
-npm run cli
+FIELDSIGHT_EXTRACT_MODEL=small npm run cli   # Qwen3-0.6B (~382MB) en vez del 4B
 ```
 
-`FIELDSIGHT_LLM_API_KEY` es la misma clave Bearer que definió el peer con
-`--api-key`; es obligatoria cuando el peer expone el server a la LAN.
-Los datos viajan solo entre los equipos del equipo — sin nube. Cumple el
-requisito de "inferencia delegada peer-to-peer" del reto.
+El modelo 4B (~2.5GB) se descarga del registry QVAC al primer uso y se cachea en
+`~/.qvac/models/`. La inferencia sobre los datos del cliente nunca sale de la
+máquina.
+
+> La delegación P2P a un server remoto (FIELDSIGHT_LLM_URL y
+> `docs/GUIDE_GPU_SERVER.md`) quedó implementada y verificada en
+> `src/extract/remote.ts` como referencia/opción futura, pero **no** es el camino
+> de la demo actual.
 
 ## Modelos (registry QVAC)
 
