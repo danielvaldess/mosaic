@@ -27,11 +27,21 @@ jobs:
       - run: npm test
       - name: Fetch bundled AI model (offline installer)
         run: npm run model:fetch
-      - name: Build installer and publish draft release
+      - name: Build installer
         shell: pwsh
         run: |
           if (-not $env:CSC_LINK) {
             Remove-Item Env:CSC_LINK -ErrorAction SilentlyContinue
             Remove-Item Env:CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
           }
-          npm run desktop:dist -- --publish always
+          npm run desktop:dist
+      - name: Create draft release
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag --clobber release/Mosaic-Setup.exe release/latest.yml
+          } else {
+            gh release create $tag --draft --title $tag --generate-notes release/Mosaic-Setup.exe release/latest.yml
+          }

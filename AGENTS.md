@@ -225,8 +225,10 @@ aceptar entradas sin validar. `MOSAIC_SEED_PATH` apunta al recurso bundleado en 
 - **E2E**: Playwright lanza la app con `MOSAIC_LLM_URL` apuntando a un stub HTTP local,
   así no descarga modelo. `MOSAIC_USER_DATA_DIR` (env) aisla la DB/evidencia del test
   y permite modo portable.
-- **CI desktop**: release-desktop.yml se dispara con tags `v*` y publica draft en GitHub Releases;
-  desktop-e2e.yml corre Playwright en windows-latest (descarga el binario de Electron antes).
+- **CI desktop**: release-desktop.yml se dispara con tags `v*`: build con `--publish never` y el
+  draft release lo crea `gh release create` (Mosaic-Setup.exe + latest.yml), evitando que
+  electron-builder publique implícitamente y duplique releases. desktop-e2e.yml corre Playwright
+  en windows-latest (descarga el binario de Electron antes).
 
 ## Convenciones
 
