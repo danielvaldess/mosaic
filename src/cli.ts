@@ -127,6 +127,7 @@ export async function runCli(opts: CliOptions): Promise<void> {
       try {
         const reply = await conversation.turn(line)
         console.log('Mosaic> ' + reply.message)
+        if (reply.suggestions?.length) console.log('  ' + reply.suggestions.join(' · '))
         if (reply.observation) console.table(reply.observation.equipment.map(e => ({ quantity: e.quantity, modality: e.modality, brand: e.brand, model: e.model, age: e.age?.qualitative ?? e.age?.min ?? 'Unknown' })))
         for (const f of reply.followUps) console.log('  ' + f.question)
         if (reply.observation && !reply.saved) console.log('Reply with more details, confirm, save anyway (duplicates), or skip.')

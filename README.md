@@ -237,3 +237,38 @@ la inferencia QVAC. El primer arranque con IA puede descargar el modelo seleccio
 - [ ] Frescura de datos con alertas
 - [ ] Oportunidades de renovación priorizadas por score
 - [ ] Duplicate detection semántica con embeddings (`EMBEDDINGGEMMA_300M_Q4_0`)
+
+
+### Chat restringido al dataset de Excel
+
+El chat usa exclusivamente el catálogo de `data/Dummy_Installed_Base_Hackathon.xlsx`,
+a través de su exportación verificada `data/dummy_installed_base.json` (20 filas).
+Las observaciones guardadas en SQLite no amplían ese catálogo.
+
+- Hospital y ubicación deben coincidir con el Excel. La ubicación ausente se toma del hospital seleccionado.
+- Modalidad, marca, modelo, cantidad y antigüedad deben pertenecer a la misma fila del hospital.
+- Cada dato faltante o incompatible produce opciones válidas; las respuestas a esas preguntas no usan el LLM.
+- Se aceptan variantes de mayúsculas/acentos. Los errores tipográficos requieren elegir una sugerencia.
+- No se guarda hasta completar la validación, incluso con autosave o `save anyway`.
+- `no sé` no omite campos obligatorios. Usa `/new` o `skip` para descartar y comenzar otra observación.
+- Voz transcrita y texto pasan por la misma validación. Notas generadas no se incorporan como hechos del catálogo.
+
+Ejemplo: escribe `Estoy en Hospital DemoCare Pacific en Panama City, Panama. Tienen dos MR.`
+Completa con **NovaMed → NM-MR 700 → 7** y revisa antes de confirmar. Si escribes **Philips**
+o una edad de **25**, se pedirán los valores del Excel y el registro no se guardará.
+
+Para probar esta copia local (elige otro puerto si 4174 ya está ocupado):
+
+```powershell
+npm ci --ignore-scripts
+npm run typecheck
+npm test
+npm run build
+$env:PORT = "4195"
+$env:MOSAIC_EXTRACT_MODEL = "small"
+npm run web
+```
+
+Abre `http://localhost:4195`. La primera descripción usa QVAC local; las preguntas posteriores
+se resuelven contra el catálogo. No es necesario sembrar SQLite para disponer de sugerencias.
+Las pruebas automatizadas usan un extractor simulado y cubren rechazo, recuperación y guardado.

@@ -1,3 +1,4 @@
+import { catalogSuggestions } from './catalog.js'
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -243,43 +244,15 @@ function mapObservation(r: Record<string, unknown>): Observation {
   }
 }
 
-export interface ChatSuggestions {
-  brands: string[]
-  models: string[]
-  hospitals: string[]
-  cities: string[]
+export type ChatSuggestions = ReturnType<typeof catalogSuggestions>
+
+// Preserve callers while sourcing options exclusively from the immutable Excel export.
+export function getChatSuggestions(_db: Database.Database): ChatSuggestions {
+  return catalogSuggestions()
 }
 
-export function getChatSuggestions(db: Database.Database): ChatSuggestions {
-  const brands = db.prepare(
-    "SELECT DISTINCT brand FROM equipment WHERE brand IS NOT NULL AND brand != 'Unknown' ORDER BY brand"
-  ).all().map((r: any) => r.brand as string)
-
-  const models = db.prepare(
-    "SELECT DISTINCT model FROM equipment WHERE model IS NOT NULL AND model != 'Unknown' ORDER BY model"
-  ).all().map((r: any) => r.model as string)
-
-  const hospitals = db.prepare(
-    "SELECT DISTINCT name FROM customers WHERE name IS NOT NULL ORDER BY name"
-  ).all().map((r: any) => r.name as string)
-
-  const cities = db.prepare(
-    "SELECT DISTINCT city FROM customers WHERE city IS NOT NULL AND city != 'Unknown' ORDER BY city"
-  ).all().map((r: any) => r.city as string)
-
-  return { brands, models, hospitals, cities }
-}
-
-export function getModalitySuggestions(db: Database.Database, modality: string): { brands: string[]; models: string[] } {
-  const brands = db.prepare(
-    "SELECT DISTINCT brand FROM equipment WHERE brand IS NOT NULL AND brand != 'Unknown' AND modality = ? ORDER BY brand"
-  ).all(modality).map((r: any) => r.brand as string)
-
-  const models = db.prepare(
-    "SELECT DISTINCT model FROM equipment WHERE model IS NOT NULL AND model != 'Unknown' AND modality = ? ORDER BY model"
-  ).all(modality).map((r: any) => r.model as string)
-
-  return { brands, models }
+export function getModalitySuggestions(_db: Database.Database, modality: string): ChatSuggestions {
+  return catalogSuggestions(modality)
 }
 
 export function clearDb(db: Database.Database): { deleted: number } {

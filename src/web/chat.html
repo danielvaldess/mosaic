@@ -1183,8 +1183,8 @@ async function loadSettings() {
     : 'e.g. I\'m at Hospital DemoCare Pacific in Panama. They have two MRI systems and a CT scanner...';
   const name = settings.name ? ', ' + settings.name : '';
   addMessage(selectedLang === 'es'
-    ? '¡Hola' + name + '! Soy Mosaic. Cuéntame qué equipos médicos viste y los estructuro para ti.'
-    : 'Hi' + name + '! I\'m Mosaic. Tell me which medical equipment you saw and I\'ll structure it for you.', 'ai');
+    ? '¡Hola' + name + '! Soy Mosaic. Usa los hospitales y equipos del dataset de Excel. Validaré cada respuesta antes de guardar.'
+    : 'Hi' + name + '! I\'m Mosaic. Use the hospitals and equipment in the Excel dataset. I\'ll validate each answer before saving.', 'ai');
   input.focus();
 }
 
@@ -1241,59 +1241,26 @@ async function loadModalitySuggestions(modality) {
   return null
 }
 
-const FALLBACK_SUGGESTIONS = {
-  brand: {
-    MR: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'Hitachi'],
-    CT: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'NeuroLogica'],
-    Ultrasound: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'Samsung'],
-    default: ['Philips', 'Siemens', 'GE Healthcare', 'Canon', 'Hitachi'],
-  },
-  model: {
-    MR: ['Ingenia', 'Achieva', 'Skyra', 'Vida', 'SIGNA', 'Vantage'],
-    CT: ['IQon', 'Brilliance', 'Revolution', 'Aquilion', 'NeuViz'],
-    Ultrasound: ['EPIQ', 'Affiniti', 'LOGIQ', 'Vivid', 'Acuson'],
-    default: ['Unknown model'],
-  },
-  age: ['New (< 2 years)', '3–5 years', '5–10 years', '10–15 years', '15–20 years', '20+ years'],
-  quantity: ['1', '2', '3', '4', '5', '6+'],
-  customer: [],
-  location: [],
-  notes: [],
-}
-
 async function getSuggestions(followUp, observation) {
-  const intent = followUp.intent
-  const modality = followUp.modality || 'default'
-
-  if (intent === 'brand') {
-    const modalityData = await loadModalitySuggestions(modality)
-    if (modalityData?.brands?.length >= 1) return modalityData.brands.slice(0, 5)
-    const dbbrands = realSuggestions.brands.filter(b => b !== 'Unknown')
-    if (dbbrands.length >= 3) return dbbrands.slice(0, 5)
-    return (FALLBACK_SUGGESTIONS.brand[modality] || FALLBACK_SUGGESTIONS.brand.default).slice(0, 5)
-  }
-  if (intent === 'model') {
-    const modalityData = await loadModalitySuggestions(modality)
-    if (modalityData?.models?.length >= 1) return modalityData.models.slice(0, 5)
-    const dbmodels = realSuggestions.models.filter(m => m !== 'Unknown')
-    if (dbmodels.length >= 3) return dbmodels.slice(0, 5)
-    return (FALLBACK_SUGGESTIONS.model[modality] || FALLBACK_SUGGESTIONS.model.default).slice(0, 5)
-  }
-  if (intent === 'customer') {
-    if (realSuggestions.hospitals.length >= 2) return realSuggestions.hospitals.slice(0, 5)
-    return []
-  }
-  if (intent === 'location') {
-    if (realSuggestions.cities.length >= 2) return realSuggestions.cities.slice(0, 5)
-    return []
-  }
-  if (intent === 'age') return FALLBACK_SUGGESTIONS.age.slice(0, 5)
-  if (intent === 'quantity') return FALLBACK_SUGGESTIONS.quantity.slice(0, 4)
-  return []
+  const data = followUp.modality ? await loadModalitySuggestions(followUp.modality) : realSuggestions
+  const key = { brand: 'brands', model: 'models', customer: 'hospitals', location: 'cities', age: 'ages', quantity: 'quantities' }[followUp.intent]
+  return key && data ? (data[key] || []) : []
 }
 
 async function showReply(data) {
   const replyBox = addMessage(data.reply, 'ai');
+  if (data.actions?.length) {
+    const controls = document.createElement('div');
+    controls.className = 'suggestions';
+    for (const action of data.actions) {
+      const button = document.createElement('button');
+      button.className = 'chip';
+      button.textContent = action.label;
+      button.onclick = () => request(action.command);
+      controls.appendChild(button);
+    }
+    replyBox.append(document.createElement('br'), controls);
+  }
 
   // Dataset suggestions: closest matching values when a free-typed answer was rejected.
   if (data.suggestions?.length) {
