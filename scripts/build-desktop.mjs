@@ -14,4 +14,6 @@ function run(command, args) {
 if (offline) {
   run('node', ['scripts/fetch-model.mjs', 'extraction'])
 }
-run('npx', ['electron-builder', '--win'])
+// Releases are created explicitly by the workflow with `gh release create`;
+// electron-builder must never publish implicitly from a git tag.
+run('npx', ['electron-builder', '--win', '--publish', 'never'])
