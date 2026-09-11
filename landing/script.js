@@ -5,8 +5,8 @@ const LINKS = {
   JOSE_LINKEDIN: 'https://www.linkedin.com/in/jos-mi-cast-300mm1500/',
   LIZMARIE_LINKEDIN: 'https://www.linkedin.com/in/lizmarie-camacho/',
   video: 'REEMPLAZAR_URL_VIDEO',
-  repository: 'REEMPLAZAR_URL_REPOSITORIO',
-  appQrImage: 'REEMPLAZAR_RUTA_QR',
+  repository: 'https://github.com/danielvaldess/mosaic',
+  appQrImage: 'assets/qr-app.svg',
 };
 
 document.querySelectorAll('[data-linkedin]').forEach((link) => {
