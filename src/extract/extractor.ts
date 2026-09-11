@@ -104,7 +104,6 @@ export async function extractObservation(
   const final = await result.final
   const stats = final.stats
   const raw = final.contentText.trim()
-  console.log('[EXTRACTOR] Raw LLM output:', raw.slice(0, 500))
 
   logEvidence({
     ts: new Date().toISOString(),

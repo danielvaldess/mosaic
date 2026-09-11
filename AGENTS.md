@@ -190,7 +190,8 @@ distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
   `files` poda `prebuilds/` de otras plataformas (android/ios/darwin/linux/win32-arm64).
 - **Rutas de usuario en desktop**: `main.ts` fija `MOSAIC_DATA_DIR`, `MOSAIC_EVIDENCE_DIR`,
   `MOSAIC_SEED_PATH` y `QVAC_CONFIG_PATH` ANTES de importar los módulos (se leen al import).
-  La DB vive en `%APPDATA%\Mosaic\data` y el dummy se siembra en el primer arranque.
+  La DB vive en `%APPDATA%\Mosaic\data` y arranca vacía (el seed automático se quitó;
+  `npm run seed` sigue cargando el dataset dummy para CLI/web y el botón Clear DB reinicia).
 - **Primer arranque**: `loadExtractionModel()` sube `QVAC_RPC_INIT_TIMEOUT_MS` a 180s porque el
   escaneo de antivirus del runtime `bare` puede superar el default de 30s.
 - **Electron 44** no corre postinstall: el binario se descarga lazy al primer `require('electron')`
@@ -202,6 +203,9 @@ distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
   `will-navigate` solo permite el origen local; links externos solo http/https vía `shell.openExternal`.
   Permisos del renderer denegados por defecto. DevTools solo en dev (`app.isPackaged`).
   El micrófono (`media`) está permitido SOLO para el origen local (voz on-device).
+- **Voz on-device (lazy)**: Whisper `WHISPER_LARGE_V3_TURBO` (~1.6 GB) se descarga y carga
+  PEREZOSAMENTE en la primera transcripción (`/api/transcribe`), nunca al arrancar.
+  `validateTranscription()` filtra alucinaciones (silencio, repeticiones, scripts inesperados).
 - **Sin ventanas de consola**: `hide-child-windows.ts` parchea `child_process` (spawn/exec/fork)
   con `windowsHide: true` al importarse ANTES que el SDK. Sin eso, el worker `bare.exe`
   (binario de consola) y el chequeo de firma de `electron-updater` abren ventanas CMD.
@@ -272,6 +276,9 @@ distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
 
 - `POST /api/chat` — conversación principal (accepts `lang`, `intent` and `modality` for follow-up answers)
 - `POST /api/followup` — follow-up directo
+- `POST /api/transcribe?lang=es|en` — STT on-device (WAV en el body, máx 5 MB)
+- `POST /api/db/clear` — borra todos los datos (botón Clear DB del chat)
+- `GET /api/suggestions/modality?modality=MR` — marcas/modelos de esa modalidad
 - `GET/POST /api/settings` — perfil de primera ejecución (nombre, idioma, ubicación)
 - `GET /api/ready` — estado de carga del modelo `{ ready, progress }`
 - `GET /onboarding` — página de primera ejecución (solo desktop)

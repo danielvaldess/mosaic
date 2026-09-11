@@ -5,6 +5,9 @@ import {
   WHISPER_LARGE_V3_TURBO,
   type ModelProgressUpdate,
 } from '@qvac/sdk'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { logEvidence } from '../evidence/logger.js'
 
 export const WHISPER_MODEL = WHISPER_LARGE_V3_TURBO
@@ -92,24 +95,33 @@ export async function transcribeBuffer(
     : lang === 'en'
       ? '[Language: English] Medical equipment observation in hospital. MRI, CT scanner, ultrasound, X-ray, medical equipment, installed, maintained, damaged, obsolete.'
       : 'Medical equipment observation. Hospital. MRI. CT scanner. Ultrasound. X-ray.'
-  const segments = await transcribe({
-    modelId,
-    audioChunk: audio as unknown as string,
-    prompt,
-    metadata: true,
-  })
-  const text = segments.map((s) => s.text).join(' ').trim()
-  logEvidence({
-    ts: new Date().toISOString(),
-    op: 'inference',
-    model: 'WHISPER_LARGE_V3_TURBO',
-    modelId,
-    prompt: `[audio-buffer lang=${lang ?? 'auto'}]`,
-    totalMs: Date.now() - t0,
-  })
-  return {
-    text,
-    segments: segments.map((s) => ({ startMs: s.startMs, endMs: s.endMs, text: s.text })),
+  const dir = mkdtempSync(join(tmpdir(), 'mosaic-voice-'))
+  const wavPath = join(dir, 'recording.wav')
+  writeFileSync(wavPath, audio)
+  try {
+    // The audio buffer overload is loosely typed; the file-path overload is the
+    // documented one, so the browser WAV is staged on disk before transcribing.
+    const segments = await transcribe({
+      modelId,
+      audioChunk: wavPath,
+      prompt,
+      metadata: true,
+    })
+    const text = segments.map((s) => s.text).join(' ').trim()
+    logEvidence({
+      ts: new Date().toISOString(),
+      op: 'inference',
+      model: 'WHISPER_LARGE_V3_TURBO',
+      modelId,
+      prompt: `[audio-buffer lang=${lang ?? 'auto'}]`,
+      totalMs: Date.now() - t0,
+    })
+    return {
+      text,
+      segments: segments.map((s) => ({ startMs: s.startMs, endMs: s.endMs, text: s.text })),
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 }
 

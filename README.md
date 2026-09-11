@@ -127,8 +127,11 @@ npm run desktop:dist:offline   # igual, garantizando el modelo bundleado
 - Tras el onboarding, lo primero que ves es el **chat saludándote por nombre** en tu idioma,
   con el modelo cargando en segundo plano (barra de progreso en el splash/onboarding).
 - El modelo corre en **GPU (Vulkan) cuando está disponible** y cae a CPU automáticamente.
-- Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia, logs); el dataset dummy se
-  siembra automáticamente en el primer arranque.
+- Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia, logs); la DB arranca vacía (sin seed
+  automático) y el chat tiene un botón **Clear DB**. `npm run seed` sigue cargando el dataset
+  dummy para CLI/web.
+- **Captura por voz**: mantén el 🎤 en el chat; Whisper large-v3-turbo transcribe on-device
+  y **se descarga (~1.6 GB) solo la primera vez que usás voz**.
 - La app es 100% local: la ventana carga el chat desde un servidor efímero en
   `127.0.0.1` embebido en el proceso.
 - **Seguridad**: sandbox + context isolation en el renderer, CSP inyectada por sesión,
@@ -155,7 +158,7 @@ npm run desktop:dist:offline   # igual, garantizando el modelo bundleado
 | Extracción (bundleado en el .exe) | `QWEN3_1_7B_INST_Q4` (`Qwen3-1.7B-Q4_0.gguf`) | ~1.0 GB |
 | Extracción (CLI/web, descarga) | `QWEN3_4B_INST_Q4_K_M` | ~2.5 GB |
 | Extracción liviana | `QWEN3_600M_INST_Q4` | ~0.4 GB |
-| Voz (STT) | `WHISPER_TINY` | ~75 MB |
+| Voz (STT) | `WHISPER_LARGE_V3_TURBO` | ~1.6 GB (lazy, primera voz) |
 
 Todos se descargan del registro distribuido QVAC al primer uso (`modelRegistry*`). También puedes apuntar `modelSrc` a cualquier `.gguf` local o URL de HuggingFace.
 
