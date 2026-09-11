@@ -41,7 +41,7 @@ Mosaic extrae información como **cliente, ciudad, país, modalidad, cantidad, m
 
 | Componente | Descripción |
 |---|---|
-| **Página web** | Landing del proyecto en https://danielvaldess.github.io/mosaic/ con botón de descarga directa de la app para Windows y espacio para el **video de presentación** que guía el uso. |
+| **Página web** | Landing del proyecto en https://danielvaldess.github.io/mosaic/ con botón de descarga directa de la app para Windows y el **video de presentación** que guía el uso. |
 | **App de escritorio (Windows)** | Instalador `.exe` offline (~1.2 GB) con todo incluido. Cada persona captura sus observaciones desde la app y todo queda **centralizado en una base local estructurada**, consultable por cliente y geografía. |
 | **Chat conversacional** | Español/Inglés, con texto y voz on-device, seguimiento de datos faltantes y confirmación antes de guardar. |
 | **Dashboard** | Customer 360, estadísticas globales, candidatos a refresco y analítica en lenguaje natural. |
@@ -215,7 +215,6 @@ Esto documenta que la IA corre **en el dispositivo** y respalda la verificación
 - Captura por **foto de placa** (multimodal Qwen3-VL / OCR) como fuente adicional de observaciones.
 - **Duplicados semánticos** con embeddings (misma máquina escrita distinto).
 - Alertas de **frescura de datos** y oportunidades de renovación priorizadas por score.
-- **Video de uso** integrado dentro de la app (la landing ya tiene el espacio preparado).
 - **Firma de código** con certificado para eliminar la advertencia de SmartScreen.
 - Auto-update automático al arrancar (hoy es manual para respetar la regla de red).
 - Delegación **P2P opcional** a una GPU del equipo (implementada como referencia en
