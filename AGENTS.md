@@ -23,7 +23,7 @@ npm run build          # compila src/ → dist/ (tsc) + copia HTML estáticos
 npm run desktop        # app Electron en dev (requiere build previo)
 npm run desktop:pack   # app empaquetada sin instalador → release/win-unpacked/
 npm run model:fetch    # trae el Qwen3-1.7B a assets/models (offline installer)
-npm run desktop:dist   # instalador NSIS → release/Mosaic-Setup-<version>.exe
+npm run desktop:dist   # instalador NSIS → release/Mosaic-Setup.exe
 npm run desktop:dist:offline # igual pero forzando model:fetch antes
 npm run test:e2e       # build + Playwright sobre la app Electron (stub LLM local)
 ```

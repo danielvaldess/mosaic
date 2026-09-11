@@ -1,6 +1,6 @@
 {
   "name": "mosaic",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mosaic - Customer Installed Base Intelligence. Captura conversacional de observaciones de campo con IA local (QVAC).",
   "type": "module",
   "private": true,

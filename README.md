@@ -108,7 +108,7 @@ Cualquier máquina Windows la instala sin Node, sin Visual Studio y sin configur
 npm run desktop                # app en dev (ventana nativa + chat)
 npm run desktop:pack           # app empaquetada sin instalador → release/win-unpacked/
 npm run model:fetch            # descarga el modelo para empaquetarlo (offline)
-npm run desktop:dist           # instalador → release/Mosaic-Setup-<version>.exe
+npm run desktop:dist           # instalador → release/Mosaic-Setup.exe
 npm run desktop:dist:offline   # igual, garantizando el modelo bundleado
 ```
 
