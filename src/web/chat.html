@@ -1038,6 +1038,7 @@
           IA local · QVAC
         </div>
         <button class="top-btn" type="button" onclick="downloadEvidence()">Evidence</button>
+        <button class="top-btn" type="button" id="demo-btn" onclick="loadDemoData()">Demo</button>
         <button class="top-btn" type="button" onclick="clearDatabase()" style="color:#f87171;border-color:#f87171">Clear DB</button>
       </div>
     </header>
@@ -1660,6 +1661,21 @@ window.send = async function() {
 
 window.showDashboard = () => { window.location.href = '/dashboard'; };
 window.downloadEvidence = () => { window.location.href = '/api/evidence'; };
+window.loadDemoData = async () => {
+  try {
+    const res = await fetch('/api/db/seed', { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      addMessage(selectedLang === 'es'
+        ? 'Datos de demostración cargados: ' + data.seeded + ' observaciones.'
+        : 'Demo data loaded: ' + data.seeded + ' observations.', 'ai');
+    } else {
+      addMessage('Error: ' + (data.error || 'seed failed'), 'ai');
+    }
+  } catch {
+    addMessage('Error de conexión.', 'ai');
+  }
+};
 window.clearDatabase = async () => {
   if (!confirm('Esto eliminará TODOS los datos de la base. ¿Estás seguro?')) return;
   try {

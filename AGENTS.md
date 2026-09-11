@@ -278,6 +278,7 @@ distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
 - `POST /api/followup` — follow-up directo
 - `POST /api/transcribe?lang=es|en` — STT on-device (WAV en el body, máx 5 MB)
 - `POST /api/db/clear` — borra todos los datos (botón Clear DB del chat)
+- `POST /api/db/seed` — carga el dataset dummy bajo demanda (botón Demo del chat)
 - `GET /api/suggestions/modality?modality=MR` — marcas/modelos de esa modalidad
 - `GET/POST /api/settings` — perfil de primera ejecución (nombre, idioma, ubicación)
 - `GET /api/ready` — estado de carga del modelo `{ ready, progress }`

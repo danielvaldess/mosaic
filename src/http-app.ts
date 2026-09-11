@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Conversation } from './agent/conversation.js'
 import type { Extraction } from './types.js'
 import { allCustomers, getChatSuggestions, getModalitySuggestions, clearDb } from './store/db.js'
+import { seedFromXlsx } from './store/seed.js'
 import { customer360, globalStats, queryInstalledBase } from './insights/insights.js'
 import { loadSettings, saveSettings, type AppSettings } from './settings.js'
 import { validateTranscription } from './voice/transcribe.js'
@@ -101,6 +102,13 @@ export function createApp(options: {
         const result = clearDb(options.db)
         sessions.clear()
         json(res, { deleted: result.deleted })
+        return
+      }
+      if (req.method === 'POST' && url.pathname === '/api/db/seed') {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) throw new HttpError(403, 'Origin not allowed')
+        const seeded = seedFromXlsx(options.db)
+        sessions.clear()
+        json(res, { seeded })
         return
       }
       if (req.method === 'POST' && ['/api/chat', '/api/followup'].includes(url.pathname)) {
