@@ -71,7 +71,8 @@ test('first run onboards, greets in the chosen language and chats; settings pers
       const response = await fetch('/api/stats')
       return response.json() as Promise<{ totalObservations: number }>
     })
-    expect(stats.totalObservations).toBe(20)
+    // Fresh desktop installs start empty: automatic demo seeding was removed.
+    expect(stats.totalObservations).toBe(0)
 
     await page.locator('#chat-input').fill(
       'I am at Hospital DemoCare Pacific in Panama. They have two MR systems and one CT.',

@@ -48,10 +48,16 @@ export async function startMosaicServer(
     return handle.extract(text)
   }
 
-  let voiceModelId: string | undefined
-  const voicePromise = loadVoiceModel().then((id) => { voiceModelId = id }).catch((err) => {
-    console.error('Voice model failed to load:', err)
-  })
+  // Voice (Whisper large-v3-turbo, ~1.6 GB) is opt-in: it only downloads and
+  // loads on the first transcription request, never at startup.
+  let voiceModelPromise: Promise<string> | undefined
+  const ensureVoiceModel = (): Promise<string> => {
+    voiceModelPromise ??= loadVoiceModel().catch((error: unknown) => {
+      voiceModelPromise = undefined
+      throw error
+    })
+    return voiceModelPromise
+  }
 
   const server = createApp({
     db, extract,
@@ -61,11 +67,7 @@ export async function startMosaicServer(
     logoPng: readFileSync(new URL('./web/mosaic-logo.png', import.meta.url)),
     evidence: exportEvidenceCsv, autoSave: process.env.MOSAIC_AUTOSAVE === '1',
     ready: () => ({ ready: modelReady, progress: modelProgress }),
-    transcribe: async (audio, lang) => {
-      const id = voiceModelId ?? await voicePromise
-      if (!id) throw new Error('Voice model not available')
-      return transcribeBuffer(id, audio, lang)
-    },
+    transcribe: async (audio, lang) => transcribeBuffer(await ensureVoiceModel(), audio, lang),
   })
   const host = options.host ?? '127.0.0.1'
   const requestedPort = options.port ?? Number(process.env.PORT ?? 4174)
@@ -84,7 +86,9 @@ export async function startMosaicServer(
       server.close(() => {
         setModelProgressListener(undefined)
         const cleanup = () => {
-          if (voiceModelId) void unloadVoiceModel(voiceModelId).catch(console.error)
+          if (voiceModelPromise) {
+            void voiceModelPromise.then((id) => unloadVoiceModel(id)).catch(console.error)
+          }
           db.close()
           resolve()
         }
