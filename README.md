@@ -128,8 +128,8 @@ npm run desktop:dist:offline   # igual, garantizando el modelo bundleado
   con el modelo cargando en segundo plano (barra de progreso en el splash/onboarding).
 - El modelo corre en **GPU (Vulkan) cuando está disponible** y cae a CPU automáticamente.
 - Los datos viven en `%APPDATA%\Mosaic` (DB, evidencia, logs); la DB arranca vacía (sin seed
-  automático) y el chat tiene un botón **Clear DB**. `npm run seed` sigue cargando el dataset
-  dummy para CLI/web.
+  automático) y el chat tiene botones **Demo** (carga el dataset dummy de 13 clientes para
+  la presentación) y **Clear DB** (borra todo). `npm run seed` también carga el dataset en CLI/web.
 - **Captura por voz**: mantén el 🎤 en el chat; Whisper large-v3-turbo transcribe on-device
   y **se descarga (~1.6 GB) solo la primera vez que usás voz**.
 - La app es 100% local: la ventana carga el chat desde un servidor efímero en

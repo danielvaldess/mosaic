@@ -67,12 +67,17 @@ test('first run onboards, greets in the chosen language and chats; settings pers
     await expect(page.locator('#messages')).toContainText('Daniel')
     await expect(page.locator('#lang-prompt')).toHaveCount(0)
 
-    const stats = await page.evaluate(async () => {
+    const readObservations = () => page.evaluate(async () => {
       const response = await fetch('/api/stats')
-      return response.json() as Promise<{ totalObservations: number }>
+      const data = await response.json() as { totalObservations: number }
+      return data.totalObservations
     })
     // Fresh desktop installs start empty: automatic demo seeding was removed.
-    expect(stats.totalObservations).toBe(0)
+    expect(await readObservations()).toBe(0)
+
+    // The Demo button loads the bundled dummy dataset on demand.
+    await page.locator('#demo-btn').click()
+    await expect.poll(readObservations).toBe(20)
 
     await page.locator('#chat-input').fill(
       'I am at Hospital DemoCare Pacific in Panama. They have two MR systems and one CT.',
