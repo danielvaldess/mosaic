@@ -65,4 +65,4 @@ nsis:
   shortcutName: Mosaic
   uninstallDisplayName: Mosaic
   deleteAppDataOnUninstall: false
-  artifactName: ${productName}-Setup-${version}.${ext}
+  artifactName: ${productName}-Setup.${ext}

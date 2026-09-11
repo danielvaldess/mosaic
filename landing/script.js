@@ -6,7 +6,7 @@ const LINKS = {
   LIZMARIE_LINKEDIN: 'https://www.linkedin.com/in/lizmarie-camacho/',
   video: 'REEMPLAZAR_URL_VIDEO',
   repository: 'https://github.com/danielvaldess/mosaic',
-  appQrImage: 'assets/qr-app.svg',
+  download: 'https://github.com/danielvaldess/mosaic/releases/latest/download/Mosaic-Setup.exe',
 };
 
 document.querySelectorAll('[data-linkedin]').forEach((link) => {
@@ -23,11 +23,7 @@ function configureLink(selector, url, fallback) {
 }
 configureLink('#video-link', LINKS.video, 'Video próximamente');
 configureLink('#repo-link', LINKS.repository, 'Repositorio próximamente');
-
-if (!LINKS.appQrImage.startsWith('REEMPLAZAR')) {
-  const qr = document.querySelector('#qr-placeholder');
-  qr.innerHTML = `<img src="${LINKS.appQrImage}" alt="Código QR para abrir la aplicación Mosaic">`;
-}
+configureLink('#download-link', LINKS.download, 'Descarga próximamente');
 
 const menuButton = document.querySelector('.menu-toggle');
 const menu = document.querySelector('.nav-links');
