@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Conversation, mergeExtraction } from '../src/agent/conversation.js'
-import { openDb, allObservations, equipmentForObservation, findOrCreateCustomer } from '../src/store/db.js'
+import { openDb, allObservations, allCustomers, equipmentForObservation, findOrCreateCustomer, insertObservation } from '../src/store/db.js'
 import { filterModalitiesMentioned, normalizeModality } from '../src/agent/agent.js'
 import { parseExtraction } from '../src/extract/prompt.js'
-import type { Extraction } from '../src/types.js'
+import type { Extraction, Observation } from '../src/types.js'
 
 const databases: ReturnType<typeof openDb>[] = []
 afterEach(() => databases.splice(0).forEach(db => db.close()))
@@ -11,6 +11,20 @@ function setup(extraction: Extraction = { customer: { name: 'Test Hospital', cit
   const db = openDb(':memory:'); databases.push(db)
   const extract = vi.fn(async (_text: string) => structuredClone(extraction))
   return { db, extract, conversation: new Conversation(db, extract, 'tester') }
+}
+
+function seedInstalledBase(db: ReturnType<typeof openDb>) {
+  const customer = findOrCreateCustomer(db, { name: 'Hospital DemoCare Pacific', city: 'Panama City', country: 'Panama' })
+  const observedAt = new Date().toISOString()
+  const observation: Observation = {
+    id: 'SEED-1', observer: 'seed', observedAt, rawInput: 'seed', source: 'Text', customerId: customer.id,
+    equipment: [{
+      id: 'SEED-1-EQ0', observationId: 'SEED-1', customerId: customer.id, modality: 'MR', quantity: 2,
+      brand: 'NovaMed', model: 'NM-MR 700', status: 'Reported', confidence: 'High',
+    }],
+    overallConfidence: 'High', status: 'Reported', reviewConfirmed: true, createdAt: observedAt,
+  }
+  insertObservation(db, observation)
 }
 
 describe('review and save', () => {
@@ -125,6 +139,95 @@ describe('extraction memory', () => {
     const merged = mergeExtraction(previous, {customer: {name: 'Unknown', country: 'Panama'}, equipment: [{modality: 'MR', model: 'MR 700'}]})
     expect(merged.customer).toEqual({name: 'Hospital', city: 'Panama', country: 'Panama'})
     expect(merged.equipment[0]).toMatchObject({modality: 'MR', quantity: 2, brand: 'NovaMed', model: 'MR 700'})
+  })
+})
+
+describe('dataset validation', () => {
+  const incomplete: Extraction = {
+    customer: { name: 'Hospital DemoCare Pacific', city: 'Panama City', country: 'Panama' },
+    equipment: [{ modality: 'MR', quantity: 2 }],
+  }
+  const firstMessage = 'Two MR systems at Hospital DemoCare Pacific in Panama City, Panama'
+
+  it('canonicalizes an exact brand answer to the dataset spelling', async () => {
+    const { db, conversation } = setup(incomplete)
+    seedInstalledBase(db)
+    let reply = await conversation.turn(firstMessage)
+    reply = await conversation.turn('novamed', reply.followUps[0]!.question)
+    expect(reply.observation?.equipment[0]?.brand).toBe('NovaMed')
+  })
+
+  it('suggests the dataset value for a typo without calling the model', async () => {
+    const { db, extract, conversation } = setup(incomplete)
+    seedInstalledBase(db)
+    let reply = await conversation.turn(firstMessage)
+    const brandQuestion = reply.followUps[0]!.question
+    const callsBefore = extract.mock.calls.length
+    reply = await conversation.turn('Nobamed', brandQuestion)
+    expect(reply.suggestions?.[0]).toBe('NovaMed')
+    expect(reply.suggestionQuestion).toBe(brandQuestion)
+    expect(reply.suggestionIntent).toBe('brand')
+    expect(reply.followUps).toEqual([])
+    expect(extract.mock.calls.length).toBe(callsBefore)
+  })
+
+  it('rejects values outside the dataset and offers the closest options', async () => {
+    const { db, conversation } = setup(incomplete)
+    seedInstalledBase(db)
+    let reply = await conversation.turn(firstMessage)
+    reply = await conversation.turn('zzzzqqq', reply.followUps[0]!.question)
+    expect(reply.suggestions).toEqual(['NovaMed'])
+    expect(reply.followUps).toEqual([])
+    expect(reply.observation).toBeUndefined()
+  })
+
+  it('accepts "I don\'t know" and stops asking that field', async () => {
+    const { db, conversation } = setup(incomplete)
+    seedInstalledBase(db)
+    let reply = await conversation.turn(firstMessage)
+    reply = await conversation.turn('no sé', reply.followUps[0]!.question)
+    expect(reply.observation?.equipment[0]?.brand).toBe('Unknown')
+    expect(reply.followUps.map(f => f.intent)).not.toContain('brand')
+  })
+
+  it('validates hospital answers against the installed base', async () => {
+    const gap: Extraction = {
+      customer: { name: 'Hospital DemoCare Pacific', city: 'Panama City', country: 'Panama' },
+      equipment: [{ modality: 'MR', quantity: 2 }],
+      missingFields: [{ field: 'customer' }],
+    }
+    const { db, conversation } = setup(gap)
+    seedInstalledBase(db)
+    let reply = await conversation.turn(firstMessage)
+    const customerQuestion = reply.followUps.find(f => f.intent === 'customer')?.question
+    expect(customerQuestion).toBeTruthy()
+    reply = await conversation.turn('Hospital Democare Pacifc', customerQuestion)
+    expect(reply.suggestions?.[0]).toBe('Hospital DemoCare Pacific')
+  })
+
+  it('drops an off-dataset brand the model invented and asks again', async () => {
+    const hallucinated: Extraction = {
+      customer: { name: 'Hospital DemoCare Pacific', city: 'Panama City', country: 'Panama' },
+      equipment: [{ modality: 'MR', quantity: 2, brand: 'DemoCare Pacific' }],
+    }
+    const { db, conversation } = setup(hallucinated)
+    seedInstalledBase(db)
+    const reply = await conversation.turn(firstMessage)
+    expect(reply.observation?.equipment[0]?.brand).toBe('Unknown')
+    expect(reply.followUps.map(f => f.intent)).toContain('brand')
+  })
+
+  it('canonicalizes a partial hospital name to the installed base', async () => {
+    const partial: Extraction = {
+      customer: { name: 'DemoCare Pacific', city: 'Panama City', country: 'Panama' },
+      equipment: [{ modality: 'MR', quantity: 2, brand: 'NovaMed' }],
+    }
+    const { db, conversation } = setup(partial)
+    seedInstalledBase(db)
+    await conversation.turn('Two MR systems at DemoCare Pacific in Panama City, Panama')
+    const names = allCustomers(db).map(c => c.name)
+    expect(names).toContain('Hospital DemoCare Pacific')
+    expect(names).not.toContain('DemoCare Pacific')
   })
 })
 

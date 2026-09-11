@@ -106,6 +106,12 @@ Extract the structured facts from their message. Rules:
   Dutch: MRI-systeem = MR, CT-scanner = CT, echograaf = Ultrasound.
 - Unknowns stay empty or "Unknown". NEVER invent a brand, model, age or quantity.
 - Preserve explicit counts: "two MR systems" means modality="MR", quantity=2; "one CT" means modality="CT", quantity=1.
+- When equipment of the SAME modality has DIFFERENT brands, models, or ages, create SEPARATE equipment entries.
+  Each entry MUST include its own quantity field with the count for THAT specific group.
+  Example: "2 Siemens MR and 2 GE MR" -> [{ modality: "MR", quantity: 2, brand: "Siemens" }, { modality: "MR", quantity: 2, brand: "GE Healthcare" }]
+  Example: "1 new Philips MR and 1 old Siemens MR" -> [{ modality: "MR", quantity: 1, brand: "Philips", ageQualitative: "new" }, { modality: "MR", quantity: 1, brand: "Siemens", ageQualitative: "old" }]
+  Example: "4 MR: 2 Siemens and 2 GE" -> [{ modality: "MR", quantity: 2, brand: "Siemens" }, { modality: "MR", quantity: 2, brand: "GE Healthcare" }]
+  CRITICAL: If the user says "2 Siemens and 2 GE", each equipment row MUST have quantity=2, NOT quantity=4.
 - MR, MRI, CT and Ultrasound are modalities, not product models. If no product model is named, omit model.
 - If no quantity is stated, omit quantity instead of assuming one. Never use an age, installation year or model number as the quantity.
 - "appears to be around 8 years old" -> ageMin=8, ageMax=10 (treat "around/approximately" as ±2).

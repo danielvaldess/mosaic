@@ -269,3 +269,23 @@ export function getChatSuggestions(db: Database.Database): ChatSuggestions {
 
   return { brands, models, hospitals, cities }
 }
+
+export function getModalitySuggestions(db: Database.Database, modality: string): { brands: string[]; models: string[] } {
+  const brands = db.prepare(
+    "SELECT DISTINCT brand FROM equipment WHERE brand IS NOT NULL AND brand != 'Unknown' AND modality = ? ORDER BY brand"
+  ).all(modality).map((r: any) => r.brand as string)
+
+  const models = db.prepare(
+    "SELECT DISTINCT model FROM equipment WHERE model IS NOT NULL AND model != 'Unknown' AND modality = ? ORDER BY model"
+  ).all(modality).map((r: any) => r.model as string)
+
+  return { brands, models }
+}
+
+export function clearDb(db: Database.Database): { deleted: number } {
+  const deleted = db.prepare('SELECT COUNT(*) AS c FROM observations').get() as { c: number }
+  db.exec('DELETE FROM equipment')
+  db.exec('DELETE FROM observations')
+  db.exec('DELETE FROM customers')
+  return { deleted: deleted.c }
+}

@@ -636,6 +636,144 @@
     transform: none;
   }
 
+  #record-btn {
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid #DDD6C9;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: .18s ease;
+  }
+
+  #record-btn:hover {
+    background: var(--red-soft);
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  #record-btn.recording {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+    animation: pulse-record 1s ease-in-out infinite;
+  }
+
+  #record-btn:disabled {
+    opacity: .45;
+    cursor: default;
+    transform: none;
+    animation: none;
+  }
+
+  @keyframes pulse-record {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(147,5,0,.3); }
+    50% { box-shadow: 0 0 0 10px rgba(147,5,0,0); }
+  }
+
+  .record-status {
+    display: none;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 6px;
+    padding: 0 2px;
+  }
+
+  .record-status.active {
+    display: block;
+  }
+
+  .voice-confirm {
+    margin: 10px 0;
+    padding: 12px;
+    background: var(--blue-soft);
+    border: 1px solid var(--blue);
+    border-radius: 12px;
+    display: none;
+  }
+
+  .voice-confirm.active {
+    display: block;
+  }
+
+  .voice-confirm-text {
+    font-size: 12px;
+    color: var(--ink);
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+  }
+
+  .voice-confirm-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .voice-confirm-edit {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid #DDD6C9;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 12px;
+    font-family: inherit;
+    resize: none;
+    color: var(--ink);
+    min-height: 36px;
+    margin-bottom: 8px;
+    outline: none;
+  }
+
+  .voice-confirm-edit:focus {
+    border-color: var(--blue);
+  }
+
+  .voice-confirm-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .voice-confirm-actions button {
+    flex: 1;
+    padding: 7px 0;
+    border: none;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .15s ease;
+  }
+
+  .voice-confirm-ok {
+    background: var(--red);
+    color: #fff;
+  }
+
+  .voice-confirm-ok:hover {
+    background: #7D0400;
+  }
+
+  .voice-confirm-cancel {
+    background: var(--surface);
+    color: var(--ink-soft);
+    border: 1px solid var(--line) !important;
+  }
+
+  .voice-confirm-cancel:hover {
+    background: var(--red-soft);
+    color: var(--red);
+    border-color: var(--red) !important;
+  }
+
   .hint {
     display: flex;
     justify-content: space-between;
@@ -900,6 +1038,7 @@
           IA local · QVAC
         </div>
         <button class="top-btn" type="button" onclick="downloadEvidence()">Evidence</button>
+        <button class="top-btn" type="button" onclick="clearDatabase()" style="color:#f87171;border-color:#f87171">Clear DB</button>
       </div>
     </header>
 
@@ -951,11 +1090,21 @@
 
           <div id="input-area">
             <div class="input-wrap">
+              <button id="record-btn" title="Mantener para grabar voz">🎤</button>
               <textarea id="chat-input" rows="1" placeholder="Ej.: Estoy en Hospital DemoCare Pacific, en Panamá. Tienen dos resonadores y un tomógrafo..."></textarea>
               <button id="send-btn" onclick="send()" aria-label="Enviar">&#9654;</button>
             </div>
+            <div class="record-status" id="record-status"></div>
+            <div class="voice-confirm" id="voice-confirm">
+              <div class="voice-confirm-label">Transcripción / Transcription</div>
+              <textarea class="voice-confirm-edit" id="voice-confirm-edit" rows="2"></textarea>
+              <div class="voice-confirm-actions">
+                <button class="voice-confirm-cancel" id="voice-confirm-cancel">Cancelar</button>
+                <button class="voice-confirm-ok" id="voice-confirm-ok">Enviar</button>
+              </div>
+            </div>
             <div class="hint">
-              <span>Enter para enviar · Shift+Enter para nueva línea</span>
+              <span>Enter para enviar · Shift+Enter para nueva línea · Mantén 🎤 para voz</span>
               <a href="/api/stats" target="_blank">API</a>
             </div>
           </div>
@@ -1069,12 +1218,26 @@ function disableOldControls() {
 /* ── Suggestions System ────────────────────────────────────────────────── */
 
 let realSuggestions = { brands: [], models: [], hospitals: [], cities: [] }
+const modalityCache = {}
 
 async function loadSuggestions() {
   try {
     const res = await fetch('/api/suggestions')
     if (res.ok) realSuggestions = await res.json()
   } catch {}
+}
+
+async function loadModalitySuggestions(modality) {
+  if (modalityCache[modality]) return modalityCache[modality]
+  try {
+    const res = await fetch('/api/suggestions/modality?modality=' + encodeURIComponent(modality))
+    if (res.ok) {
+      const data = await res.json()
+      modalityCache[modality] = data
+      return data
+    }
+  } catch {}
+  return null
 }
 
 const FALLBACK_SUGGESTIONS = {
@@ -1097,16 +1260,20 @@ const FALLBACK_SUGGESTIONS = {
   notes: [],
 }
 
-function getSuggestions(followUp, observation) {
+async function getSuggestions(followUp, observation) {
   const intent = followUp.intent
   const modality = followUp.modality || 'default'
 
   if (intent === 'brand') {
+    const modalityData = await loadModalitySuggestions(modality)
+    if (modalityData?.brands?.length >= 1) return modalityData.brands.slice(0, 5)
     const dbbrands = realSuggestions.brands.filter(b => b !== 'Unknown')
     if (dbbrands.length >= 3) return dbbrands.slice(0, 5)
     return (FALLBACK_SUGGESTIONS.brand[modality] || FALLBACK_SUGGESTIONS.brand.default).slice(0, 5)
   }
   if (intent === 'model') {
+    const modalityData = await loadModalitySuggestions(modality)
+    if (modalityData?.models?.length >= 1) return modalityData.models.slice(0, 5)
     const dbmodels = realSuggestions.models.filter(m => m !== 'Unknown')
     if (dbmodels.length >= 3) return dbmodels.slice(0, 5)
     return (FALLBACK_SUGGESTIONS.model[modality] || FALLBACK_SUGGESTIONS.model.default).slice(0, 5)
@@ -1124,8 +1291,22 @@ function getSuggestions(followUp, observation) {
   return []
 }
 
-function showReply(data) {
-  addMessage(data.reply, 'ai');
+async function showReply(data) {
+  const replyBox = addMessage(data.reply, 'ai');
+
+  // Dataset suggestions: closest matching values when a free-typed answer was rejected.
+  if (data.suggestions?.length) {
+    const chipContainer = document.createElement('div');
+    chipContainer.className = 'suggestions';
+    for (const s of data.suggestions) {
+      const chip = document.createElement('button');
+      chip.className = 'chip';
+      chip.textContent = s;
+      chip.onclick = () => request(s, data.suggestionQuestion, data.suggestionIntent, data.suggestionModality);
+      chipContainer.appendChild(chip);
+    }
+    replyBox.append(document.createElement('br'), chipContainer);
+  }
 
   if (data.observation) {
     const lines = data.observation.equipment.map(e =>
@@ -1151,7 +1332,7 @@ function showReply(data) {
       box.appendChild(remaining);
     }
 
-    const suggestions = getSuggestions(followUp, data.observation);
+    const suggestions = await getSuggestions(followUp, data.observation);
 
     if (suggestions.length) {
       const chipContainer = document.createElement('div');
@@ -1160,7 +1341,7 @@ function showReply(data) {
         const chip = document.createElement('button');
         chip.className = 'chip';
         chip.textContent = s;
-        chip.onclick = () => request(s, followUp.question);
+        chip.onclick = () => request(s, followUp.question, followUp.intent, followUp.modality);
         chipContainer.appendChild(chip);
       }
       box.append(document.createElement('br'), chipContainer);
@@ -1172,7 +1353,7 @@ function showReply(data) {
       button.textContent = 'Enviar';
 
       const submit = () => {
-        if (answer.value.trim()) request(answer.value.trim(), followUp.question);
+        if (answer.value.trim()) request(answer.value.trim(), followUp.question, followUp.intent, followUp.modality);
       };
 
       button.onclick = submit;
@@ -1200,7 +1381,7 @@ function showReply(data) {
   }
 }
 
-async function request(message, question) {
+async function request(message, question, intent, modality) {
   if (busy) return;
   if (!selectedLang) {
     addMessage(selectedLang === null ? 'Por favor selecciona un idioma primero / Please select a language first' : '', 'ai');
@@ -1221,7 +1402,7 @@ async function request(message, question) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message, question, sessionId, lang: selectedLang})
+      body: JSON.stringify({message, question, intent, modality, sessionId, lang: selectedLang})
     });
 
     const data = await res.json();
@@ -1232,13 +1413,211 @@ async function request(message, question) {
     }
 
     sessionId = data.sessionId;
-    showReply(data);
+    await showReply(data);
   } catch (error) {
     activeControls.forEach(el => el.disabled = false);
     addMessage('Error: ' + error.message, 'ai');
   } finally {
     waiting.remove();
     busy = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+/* ── Voice Recording (Push-to-Record → Whisper → Chat) ────────────────── */
+
+const recordBtn = document.getElementById('record-btn');
+const recordStatus = document.getElementById('record-status');
+const voiceConfirm = document.getElementById('voice-confirm');
+const voiceConfirmEdit = document.getElementById('voice-confirm-edit');
+const voiceConfirmOk = document.getElementById('voice-confirm-ok');
+const voiceConfirmCancel = document.getElementById('voice-confirm-cancel');
+let audioContext = null;
+let mediaStream = null;
+let scriptNode = null;
+let pcmChunks = [];
+let isRecording = false;
+
+function setRecordStatus(text, show = true) {
+  recordStatus.textContent = text;
+  recordStatus.classList.toggle('active', show);
+}
+
+function showConfirmation(text) {
+  voiceConfirmEdit.value = text;
+  voiceConfirm.classList.add('active');
+  recordBtn.disabled = true;
+  sendBtn.disabled = true;
+}
+
+function hideConfirmation() {
+  voiceConfirm.classList.remove('active');
+  voiceConfirmEdit.value = '';
+  recordBtn.disabled = false;
+  sendBtn.disabled = false;
+}
+
+voiceConfirmOk.addEventListener('click', async () => {
+  const text = voiceConfirmEdit.value.trim();
+  hideConfirmation();
+  if (text) await request(text);
+});
+
+voiceConfirmCancel.addEventListener('click', () => {
+  hideConfirmation();
+  setRecordStatus(selectedLang === 'es' ? 'Grabación descartada' : 'Recording discarded');
+  setTimeout(() => setRecordStatus('', false), 2000);
+});
+
+function encodeWAV(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  function writeString(offset, str) {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  }
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+recordBtn.addEventListener('mousedown', startRecording);
+recordBtn.addEventListener('mouseup', stopRecording);
+recordBtn.addEventListener('mouseleave', () => { if (isRecording) stopRecording(); });
+recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+async function startRecording() {
+  if (busy || !selectedLang) {
+    if (!selectedLang) addMessage('Selecciona un idioma primero / Select a language first', 'ai');
+    return;
+  }
+  if (isRecording) return;
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+    audioContext = new AudioContext({ sampleRate: 16000 });
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+    pcmChunks = [];
+    scriptNode.onaudioprocess = (e) => {
+      if (!isRecording) return;
+      const channelData = e.inputBuffer.getChannelData(0);
+      pcmChunks.push(new Float32Array(channelData));
+    };
+    source.connect(scriptNode);
+    scriptNode.connect(audioContext.destination);
+    isRecording = true;
+    recordBtn.classList.add('recording');
+    setRecordStatus(selectedLang === 'es' ? '🔴 Grabando... suelta para enviar' : '🔴 Recording... release to send');
+  } catch (err) {
+    setRecordStatus(err.name === 'NotAllowedError'
+      ? 'Permiso de micrófono denegado'
+      : 'Error al acceder al micrófono: ' + err.message);
+  }
+}
+
+function stopRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+  recordBtn.classList.remove('recording');
+  setRecordStatus(selectedLang === 'es' ? '⏳ Transcribiendo...' : '⏳ Transcribing...');
+  if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
+  if (audioContext) { audioContext.close(); audioContext = null; }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  sendRecording();
+}
+
+async function sendRecording() {
+  if (pcmChunks.length === 0) { setRecordStatus(''); return; }
+  const totalLength = pcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const merged = new Float32Array(totalLength);
+  let offset = 0;
+  for (const chunk of pcmChunks) { merged.set(chunk, offset); offset += chunk.length; }
+  pcmChunks = [];
+
+  // Trim silence from start and end
+  const threshold = 0.01;
+  let start = 0;
+  while (start < merged.length && Math.abs(merged[start]) < threshold) start++;
+  let end = merged.length - 1;
+  while (end > start && Math.abs(merged[end]) < threshold) end--;
+  const trimmed = merged.slice(start, end + 1);
+
+  if (trimmed.length < 16000) {
+    setRecordStatus(selectedLang === 'es' ? 'Grabación muy corta' : 'Recording too short');
+    return;
+  }
+
+  // Normalize audio levels
+  let maxVal = 0;
+  for (let i = 0; i < trimmed.length; i++) {
+    const abs = Math.abs(trimmed[i]);
+    if (abs > maxVal) maxVal = abs;
+  }
+  const normalized = new Float32Array(trimmed.length);
+  if (maxVal > 0.01) {
+    const gain = 0.8 / maxVal;
+    for (let i = 0; i < trimmed.length; i++) {
+      normalized[i] = trimmed[i] * gain;
+    }
+  } else {
+    normalized.set(trimmed);
+  }
+
+  const wavBlob = encodeWAV(normalized, 16000);
+  recordBtn.disabled = true;
+  sendBtn.disabled = true;
+
+  try {
+    const res = await fetch('/api/transcribe?lang=' + encodeURIComponent(selectedLang), { method: 'POST', body: wavBlob });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Transcription failed');
+
+    if (data.valid === false) {
+      const reasons = {
+        empty: selectedLang === 'es' ? 'No se detectó voz' : 'No speech detected',
+        too_short: selectedLang === 'es' ? 'Grabación muy corta' : 'Recording too short',
+        hallucination: selectedLang === 'es'
+          ? 'No pude entender bien lo que dijiste. Intenta de nuevo hablando más claro y cerca del micrófono.'
+          : 'I couldn\'t quite understand. Try again speaking clearer and closer to the microphone.',
+        repeated: selectedLang === 'es'
+          ? 'Parece que se repitió. Intenta de nuevo.'
+          : 'It seems repeated. Try again.',
+        wrong_language: selectedLang === 'es'
+          ? 'El audio no se detectó en el idioma correcto. Asegúrate de hablar en español.'
+          : 'The audio wasn\'t detected in the correct language. Make sure to speak in English.',
+      };
+      setRecordStatus(reasons[data.reason] || reasons.hallucination);
+      return;
+    }
+
+    const text = data.text.trim();
+    if (!text) {
+      setRecordStatus(selectedLang === 'es' ? 'No se detectó voz' : 'No speech detected');
+      return;
+    }
+
+    setRecordStatus('');
+    showConfirmation(text);
+  } catch (err) {
+    setRecordStatus('Error: ' + err.message);
+  } finally {
+    recordBtn.disabled = false;
     sendBtn.disabled = false;
     input.focus();
   }
@@ -1281,6 +1660,20 @@ window.send = async function() {
 
 window.showDashboard = () => { window.location.href = '/dashboard'; };
 window.downloadEvidence = () => { window.location.href = '/api/evidence'; };
+window.clearDatabase = async () => {
+  if (!confirm('Esto eliminará TODOS los datos de la base. ¿Estás seguro?')) return;
+  try {
+    const res = await fetch('/api/db/clear', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      addMessage('Base de datos limpiada. Se eliminaron ' + data.deleted + ' observaciones.', 'ai');
+    } else {
+      addMessage('Error al limpiar la base de datos.', 'ai');
+    }
+  } catch (err) {
+    addMessage('Error de conexión.', 'ai');
+  }
+};
 
 input.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) {

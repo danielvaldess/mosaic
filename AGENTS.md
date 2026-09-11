@@ -121,9 +121,31 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - Templates por idioma para brand, model, age, quantity, customer, location, notes
 - Cada pregunta incluye razón (ej: "Knowing the manufacturer helps track equipment lifecycle")
 
-### Detección de intents multilíngüe (`applyFollowUpAnswer`)
-- Regex multiidioma para detectar intención de la pregunta (no solo keywords en inglés)
+### Detección de intents multilíngüe (`detectFollowUpIntent`)
+- Regex multiidioma para detectar la intención de una pregunta de follow-up (una sola intención)
 - Marca: brand/marca/marque/hersteller/merk, Edad: age/old/años/ans/jahre/etc.
+- El web manda `intent` y `modality` en el body de `/api/chat` (opcionales); el servidor
+  cae al regex si no vienen (CLI y tests no los mandan)
+
+## Validación contra el dataset (`src/agent/dataset-match.ts`)
+
+El chat está enfocado al vocabulario del installed base: marcas, modelos y hospitales
+que existen en la DB. `matchDataset()` compara con normalización de acentos/caso y
+distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
+("aurelia" → "Aurelia Health", "DemoCare Pacific" → "Hospital DemoCare Pacific").
+
+- **Respuestas de follow-up** (brand/model/customer): en `Conversation.turn()` antes de
+  inferir. Exacto → se canoniza a la grafía del dataset; cercano → reply con
+  `suggestions` + `suggestionQuestion/Intent/Modality` (chips en el frontend, sin gastar
+  GPU); inválido → se rechaza y se ofrecen las opciones más cercanas. Si la DB no tiene
+  vocabulario (instalación limpia) la validación se saltea para no bloquear.
+- **Extracción del LLM**: `alignWithDataset()` descarta brand/model inventados que no
+  existen en la DB (vuelve a preguntar con opciones válidas) y canoniza near-matches.
+  El nombre del hospital solo se canoniza, nunca se descarta (así se agregan hospitales nuevos).
+- **"No sé"** (`isUnknownAnswer`): declina el campo sin guardarlo y no se vuelve a preguntar
+  (`this.declined`, se limpia en `reset()`).
+- Umbral close = 0.72; sugerencias ordenadas por score (máx 5).
+- La validación NO aplica a age/quantity (parseo numérico) ni a notes/location (texto libre).
 
 ## Mejoras en la conversación
 
@@ -179,6 +201,11 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
   probar el chat: usa `'unsafe-inline'` porque chat.html tiene `<script>`/`<style>` inline).
   `will-navigate` solo permite el origen local; links externos solo http/https vía `shell.openExternal`.
   Permisos del renderer denegados por defecto. DevTools solo en dev (`app.isPackaged`).
+  El micrófono (`media`) está permitido SOLO para el origen local (voz on-device).
+- **Sin ventanas de consola**: `hide-child-windows.ts` parchea `child_process` (spawn/exec/fork)
+  con `windowsHide: true` al importarse ANTES que el SDK. Sin eso, el worker `bare.exe`
+  (binario de consola) y el chequeo de firma de `electron-updater` abren ventanas CMD.
+  No quitar ese import de `main.ts` ni reordenarlo.
 - **Auto-update**: `electron-updater` se importa con `createRequire` porque el import ESM named
   falla; el check es MANUAL por defecto (menú Help) para no romper la regla de red del hackathon.
   `MOSAIC_AUTO_UPDATE=1` lo activa al arrancar. `app-update.yml` lo genera electron-builder.
@@ -243,7 +270,7 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 
 ## API Endpoints
 
-- `POST /api/chat` — conversación principal (accepts `lang` param for locked language)
+- `POST /api/chat` — conversación principal (accepts `lang`, `intent` and `modality` for follow-up answers)
 - `POST /api/followup` — follow-up directo
 - `GET/POST /api/settings` — perfil de primera ejecución (nombre, idioma, ubicación)
 - `GET /api/ready` — estado de carga del modelo `{ ready, progress }`

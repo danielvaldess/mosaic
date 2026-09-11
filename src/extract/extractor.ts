@@ -13,6 +13,39 @@ import { logEvidence } from '../evidence/logger.js'
 import { SYSTEM_PROMPT, EXTRACTION_SCHEMA, parseExtraction } from './prompt.js'
 import type { Extraction } from '../types.js'
 
+/**
+ * Extracts the first valid JSON object from LLM output that may contain
+ * markdown fences, explanations, or trailing text.
+ */
+function parseJsonResponse(raw: string): Extraction {
+  // Strip <think>...</think> blocks (Qwen3 thinking tokens)
+  const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  // Try fenced code block first (```json ... ```)
+  const fenced = cleaned.match(/```(?:json)?\s*\n?(\{[\s\S]*?\})\s*\n?```/)
+  if (fenced?.[1]) return JSON.parse(fenced[1])
+  // Find first complete JSON object using brace counting
+  const start = cleaned.indexOf('{')
+  if (start === -1) throw new Error(`Model did not return JSON: ${cleaned.slice(0, 200)}`)
+  let depth = 0
+  let inString = false
+  let escape = false
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned.charAt(i)
+    if (escape) { escape = false; continue }
+    if (ch === '\\' && inString) { escape = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) {
+        return JSON.parse(cleaned.slice(start, i + 1))
+      }
+    }
+  }
+  throw new Error(`Model returned incomplete JSON: ${cleaned.slice(start, start + 200)}`)
+}
+
 type ModelProgressListener = (update: ModelProgressUpdate) => void
 let modelProgressListener: ModelProgressListener | undefined
 
@@ -71,6 +104,7 @@ export async function extractObservation(
   const final = await result.final
   const stats = final.stats
   const raw = final.contentText.trim()
+  console.log('[EXTRACTOR] Raw LLM output:', raw.slice(0, 500))
 
   logEvidence({
     ts: new Date().toISOString(),
@@ -86,9 +120,8 @@ export async function extractObservation(
     backendDevice: stats?.backendDevice,
   })
 
-  const jsonMatch = raw.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error(`Model did not return JSON: ${raw.slice(0, 200)}`)
-  return { extraction: parseExtraction(JSON.parse(jsonMatch[0])), stats }
+  const extraction = parseJsonResponse(raw)
+  return { extraction: parseExtraction(extraction), stats }
 }
 
 export async function loadExtractionModel() {
@@ -109,14 +142,26 @@ export async function loadExtractionModel() {
     ? await loadModel({
         modelSrc: bundled,
         modelType: 'llamacpp-completion',
-        modelConfig: { ctx_size: 8192 } as Record<string, unknown>,
+        modelConfig: {
+          ctx_size: 8192,
+          gpu_layers: 99,
+          device: 'gpu',
+          'flash-attn': 'on',
+          'main-gpu': 'dedicated',
+          parallel: 2,
+        } as Record<string, unknown>,
         onProgress: reportProgress,
       })
     : await loadModel({
-        // Union of two LLM descriptors confuses the overload resolution; both are
-        // llamacpp-completion models, so pin to the Qwen3-4B descriptor type.
         modelSrc: EXTRACTION_MODEL as typeof QWEN3_4B_INST_Q4_K_M,
-        modelConfig: { ctx_size: 8192 } as Record<string, unknown>,
+        modelConfig: {
+          ctx_size: 8192,
+          gpu_layers: 99,
+          device: 'gpu',
+          'flash-attn': 'on',
+          'main-gpu': 'dedicated',
+          parallel: 2,
+        } as Record<string, unknown>,
         onProgress: reportProgress,
       })
   loadedModelName = usingBundled && bundled ? basename(bundled) : EXTRACTION_MODEL_NAME

@@ -4,14 +4,17 @@ import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { Conversation } from './agent/conversation.js'
 import type { Extraction } from './types.js'
-import { allCustomers, getChatSuggestions } from './store/db.js'
+import { allCustomers, getChatSuggestions, getModalitySuggestions, clearDb } from './store/db.js'
 import { customer360, globalStats, queryInstalledBase } from './insights/insights.js'
 import { loadSettings, saveSettings, type AppSettings } from './settings.js'
+import { validateTranscription } from './voice/transcribe.js'
 
 const requestSchema = z.object({
   message: z.string().trim().min(1).max(8000),
   sessionId: z.string().uuid().optional(),
   question: z.string().max(1000).optional(),
+  intent: z.enum(['brand', 'model', 'age', 'quantity', 'customer', 'location', 'notes']).optional(),
+  modality: z.string().max(80).optional(),
   lang: z.enum(['en', 'es', 'pt', 'fr', 'de', 'it', 'nl']).optional(),
 })
 
@@ -46,6 +49,22 @@ async function readBody<T>(req: IncomingMessage, schema: z.ZodType<T>, errorMess
   catch { throw new HttpError(400, errorMessage) }
 }
 
+async function readBinaryBody(req: IncomingMessage, maxBytes: number): Promise<Buffer> {
+  let size = 0
+  const chunks: Buffer[] = []
+  await new Promise<void>((resolve, reject) => {
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length
+      if (size > maxBytes) { reject(new HttpError(413, 'Audio too large')); return }
+      chunks.push(chunk)
+    })
+    req.on('end', resolve)
+    req.on('error', reject)
+    req.on('aborted', () => reject(new HttpError(400, 'Request aborted')))
+  })
+  return Buffer.concat(chunks)
+}
+
 export interface SettingsStore {
   get: () => AppSettings
   save: (settings: AppSettings) => AppSettings
@@ -58,6 +77,7 @@ export function createApp(options: {
   logoPng?: Buffer
   settingsStore?: SettingsStore
   ready?: () => { ready: boolean; progress: number }
+  transcribe?: (audio: Buffer, lang?: string) => Promise<{ text: string; segments: Array<{ startMs: number; endMs: number; text: string }> }>
 }) {
   const sessions = new Map<string, { conversation: Conversation; touched: number }>()
   const settingsStore = options.settingsStore ?? { get: loadSettings, save: saveSettings }
@@ -74,6 +94,13 @@ export function createApp(options: {
         const body = await readBody(req, settingsSchema, 'Invalid settings payload.')
         const saved = settingsStore.save({ ...settingsStore.get(), ...body, onboardingComplete: true })
         json(res, saved)
+        return
+      }
+      if (req.method === 'POST' && url.pathname === '/api/db/clear') {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) throw new HttpError(403, 'Origin not allowed')
+        const result = clearDb(options.db)
+        sessions.clear()
+        json(res, { deleted: result.deleted })
         return
       }
       if (req.method === 'POST' && ['/api/chat', '/api/followup'].includes(url.pathname)) {
@@ -98,10 +125,26 @@ export function createApp(options: {
         }
         busy = true
         try {
-          const reply = await session.conversation.turn(body.message, body.question, body.lang)
+          const reply = await session.conversation.turn(body.message, body.question, body.lang, { intent: body.intent, modality: body.modality })
           session.touched = Date.now()
           json(res, { ...reply, reply: reply.message, sessionId, ms: Date.now() - now })
         } finally { busy = false }
+        return
+      }
+      if (req.method === 'POST' && url.pathname === '/api/transcribe') {
+        if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) throw new HttpError(403, 'Origin not allowed')
+        if (!options.transcribe) throw new HttpError(503, 'Voice transcription not available')
+        const lang = url.searchParams.get('lang') || undefined
+        const audio = await readBinaryBody(req, 5 * 1024 * 1024)
+        if (audio.length === 0) throw new HttpError(400, 'Empty audio')
+        const result = await options.transcribe(audio, lang)
+        const validation = validateTranscription(result.text, result.segments, lang)
+        json(res, {
+          text: result.text,
+          segments: result.segments,
+          valid: validation.valid,
+          reason: validation.reason,
+        })
         return
       }
       if (req.method !== 'GET') throw new HttpError(405, 'Method not allowed')
@@ -120,6 +163,11 @@ export function createApp(options: {
       else if (url.pathname === '/api/customers') json(res, allCustomers(options.db).map(c => customer360(options.db, c)))
       else if (url.pathname === '/api/customers/refresh') json(res, globalStats(options.db).refreshCandidates)
       else if (url.pathname === '/api/suggestions') json(res, getChatSuggestions(options.db))
+      else if (url.pathname === '/api/suggestions/modality') {
+        const modality = url.searchParams.get('modality')?.trim()
+        if (!modality) throw new HttpError(400, 'modality parameter required')
+        json(res, getModalitySuggestions(options.db, modality))
+      }
       else if (url.pathname === '/api/query') {
         const q = url.searchParams.get('q')?.trim()
         if (!q) throw new HttpError(400, 'q parameter required')
@@ -130,7 +178,7 @@ export function createApp(options: {
       } else throw new HttpError(404, 'Not found')
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500
-      if (status === 500) console.error(error)
+      if (status === 500) console.error('[CHAT ERROR]', error instanceof Error ? error.stack : error)
       if (!res.destroyed && !res.headersSent) json(res, { error: status === 500 ? 'Could not process the observation. Please retry.' : (error as Error).message }, status)
     }
   })

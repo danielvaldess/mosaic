@@ -423,6 +423,24 @@ const M: Record<string, Record<Lang, string>> = {
     it: 'Ho bisogno di un po\' più di dettaglio. Potresti descrivere i dispositivi medici che hai osservato? Per esempio: "Ho visto due risonanze magnetiche e un tomografo all\'ospedale Central."',
     nl: 'Ik heb iets meer details nodig. Kunt u de medische apparaten beschermen die u heeft waargenomen? Bijvoorbeeld: "Ik heb twee MRI-systemen en een CT-scanner gezien in het Ziekenhuis Central."',
   },
+  valueSuggestion: {
+    en: 'Did you mean "{value}"? Pick an option or type it again.',
+    es: '¿Quisiste decir «{value}»? Elige una opción o escribe de nuevo.',
+    pt: 'Você quis dizer "{value}"? Escolha uma opção ou digite novamente.',
+    fr: 'Vouliez-vous dire « {value} » ? Choisissez une option ou saisissez à nouveau.',
+    de: 'Meinten Sie "{value}"? Wählen Sie eine Option oder geben Sie erneut ein.',
+    it: 'Intendevi "{value}"? Scegli un\'opzione o digita di nuovo.',
+    nl: 'Bedoelde u "{value}"? Kies een optie of typ opnieuw.',
+  },
+  valueNotInDataset: {
+    en: '"{value}" is not in the dataset. Pick one of these options:',
+    es: '«{value}» no está en la base de datos. Elige una de estas opciones:',
+    pt: '"{value}" não está na base de dados. Escolha uma destas opções:',
+    fr: '« {value} » n\'est pas dans la base de données. Choisissez une de ces options :',
+    de: '"{value}" ist nicht in der Datenbank. Wählen Sie eine dieser Optionen:',
+    it: '"{value}" non è nel database. Scegli una di queste opzioni:',
+    nl: '"{value}" staat niet in de database. Kies een van deze opties:',
+  },
 }
 
 function msg(key: string, lang: Lang): string {
@@ -496,6 +514,14 @@ export function msgNoEquipmentGuidance(lang: Lang): string {
 
 export function msgSimpleResponseGuidance(lang: Lang): string {
   return msg('simpleResponseGuidance', lang)
+}
+
+export function msgValueSuggestion(value: string, lang: Lang): string {
+  return fill(msg('valueSuggestion', lang), { value })
+}
+
+export function msgValueNotInDataset(value: string, lang: Lang): string {
+  return fill(msg('valueNotInDataset', lang), { value })
 }
 
 // ─── Summary builder ──────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import './hide-child-windows.js'
 import { app, BrowserWindow, Menu, dialog, shell, type MenuItemConstructorOptions } from 'electron'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -139,13 +140,6 @@ async function bootstrap(): Promise<void> {
 
   win = createWindow()
   await win.loadFile(join(import.meta.dirname, 'loading.html'))
-
-  try {
-    const { seedFromXlsx } = await import('../store/seed.js')
-    seedFromXlsx()
-  } catch (error) {
-    log.warn('Seed skipped', error)
-  }
 
   const { startMosaicServer } = await import('../web-server.js')
   const server = await startMosaicServer({

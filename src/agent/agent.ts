@@ -39,6 +39,12 @@ export interface AgentReply {
   observation?: Observation
   saved?: boolean
   duplicates?: DuplicateHit[]
+  /** Dataset values offered as chips when a free-typed answer did not match. */
+  suggestions?: string[]
+  /** Original question the suggestions answer, so a chip click resolves the right field. */
+  suggestionQuestion?: string
+  suggestionIntent?: FollowUp['intent']
+  suggestionModality?: string
 }
 
 export interface DuplicateHit {

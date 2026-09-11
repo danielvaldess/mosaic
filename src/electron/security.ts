@@ -25,13 +25,15 @@ export function applySecurityPolicies(allowedOrigin: () => string | undefined): 
   target.setPermissionRequestHandler((contents, permission, callback) => {
     const origin = allowedOrigin()
     const requestingUrl = contents.getURL()
-    const allowed = permission === 'geolocation' && origin !== undefined && requestingUrl.startsWith(origin)
+    const isLocal = origin !== undefined && requestingUrl.startsWith(origin)
+    const allowed = isLocal && (permission === 'geolocation' || permission === 'media')
     if (!allowed) log.warn(`Denied permission request: ${permission}`)
     callback(allowed)
   })
   target.setPermissionCheckHandler((_contents, permission, requestingOrigin) => {
     const origin = allowedOrigin()
-    return permission === 'geolocation' && origin !== undefined && requestingOrigin.startsWith(origin)
+    const isLocal = origin !== undefined && requestingOrigin.startsWith(origin)
+    return isLocal && (permission === 'geolocation' || permission === 'media')
   })
 }
 

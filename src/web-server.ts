@@ -6,6 +6,7 @@ import { createInference, type ExtractFn, type InferenceHandle } from './extract
 import { setModelProgressListener } from './extract/extractor.js'
 import { initEvidence, exportEvidenceCsv } from './evidence/logger.js'
 import { createApp } from './http-app.js'
+import { loadVoiceModel, transcribeBuffer, unloadVoiceModel } from './voice/transcribe.js'
 
 export interface MosaicServer {
   port: number
@@ -47,6 +48,11 @@ export async function startMosaicServer(
     return handle.extract(text)
   }
 
+  let voiceModelId: string | undefined
+  const voicePromise = loadVoiceModel().then((id) => { voiceModelId = id }).catch((err) => {
+    console.error('Voice model failed to load:', err)
+  })
+
   const server = createApp({
     db, extract,
     chatHtml: readFileSync(new URL('./web/chat.html', import.meta.url), 'utf8'),
@@ -55,6 +61,11 @@ export async function startMosaicServer(
     logoPng: readFileSync(new URL('./web/mosaic-logo.png', import.meta.url)),
     evidence: exportEvidenceCsv, autoSave: process.env.MOSAIC_AUTOSAVE === '1',
     ready: () => ({ ready: modelReady, progress: modelProgress }),
+    transcribe: async (audio, lang) => {
+      const id = voiceModelId ?? await voicePromise
+      if (!id) throw new Error('Voice model not available')
+      return transcribeBuffer(id, audio, lang)
+    },
   })
   const host = options.host ?? '127.0.0.1'
   const requestedPort = options.port ?? Number(process.env.PORT ?? 4174)
@@ -72,13 +83,16 @@ export async function startMosaicServer(
     closing ??= new Promise<void>((resolve) => {
       server.close(() => {
         setModelProgressListener(undefined)
-        if (inference) {
-          void inference.dispose().catch(console.error).finally(() => { db.close(); resolve() })
-        } else {
-          // Model still loading: never block shutdown on a background download.
-          void inferencePromise.catch(() => {}).then(() => inference?.dispose()).catch(console.error)
+        const cleanup = () => {
+          if (voiceModelId) void unloadVoiceModel(voiceModelId).catch(console.error)
           db.close()
           resolve()
+        }
+        if (inference) {
+          void inference.dispose().catch(console.error).finally(cleanup)
+        } else {
+          void inferencePromise.catch(() => {}).then(() => inference?.dispose()).catch(console.error)
+          cleanup()
         }
       })
     })
