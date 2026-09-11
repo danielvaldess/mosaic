@@ -108,10 +108,11 @@ Extract the structured facts from their message. Rules:
 - Preserve explicit counts: "two MR systems" means modality="MR", quantity=2; "one CT" means modality="CT", quantity=1.
 - When equipment of the SAME modality has DIFFERENT brands, models, or ages, create SEPARATE equipment entries.
   Each entry MUST include its own quantity field with the count for THAT specific group.
-  Example: "2 Siemens MR and 2 GE MR" -> [{ modality: "MR", quantity: 2, brand: "Siemens" }, { modality: "MR", quantity: 2, brand: "GE Healthcare" }]
-  Example: "1 new Philips MR and 1 old Siemens MR" -> [{ modality: "MR", quantity: 1, brand: "Philips", ageQualitative: "new" }, { modality: "MR", quantity: 1, brand: "Siemens", ageQualitative: "old" }]
-  Example: "4 MR: 2 Siemens and 2 GE" -> [{ modality: "MR", quantity: 2, brand: "Siemens" }, { modality: "MR", quantity: 2, brand: "GE Healthcare" }]
-  CRITICAL: If the user says "2 Siemens and 2 GE", each equipment row MUST have quantity=2, NOT quantity=4.
+  Example: "3 BluePeak Medical MR model BP-MR 500 and 1 BluePeak Medical MR model BP-MR 900" -> [{ modality: "MR", quantity: 3, brand: "BluePeak Medical", model: "BP-MR 500" }, { modality: "MR", quantity: 1, brand: "BluePeak Medical", model: "BP-MR 900" }]
+  Each row keeps its own count, never the total of all groups.
+- The application validates every extracted value against the Excel dataset after extraction.
+  Preserve what the user actually said, including unsupported names, so validation can ask for a correction.
+  Never silently replace a supplied brand, model, hospital, quantity or age with a guessed catalog value.
 - MR, MRI, CT and Ultrasound are modalities, not product models. If no product model is named, omit model.
 - If no quantity is stated, omit quantity instead of assuming one. Never use an age, installation year or model number as the quantity.
 - "appears to be around 8 years old" -> ageMin=8, ageMax=10 (treat "around/approximately" as ±2).

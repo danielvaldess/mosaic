@@ -85,11 +85,11 @@ it('cleans only bare modality aliases from product models', () => {
 
 it('asks for a missing count before autosave or confirmation', async () => {
   const {db, customer} = setup()
-  const extraction: Extraction = {customer: hospital, equipment: [{modality: 'MR'}]}
+  const extraction: Extraction = {customer: {name: 'Hospital DemoCare Pacific'}, equipment: [{modality: 'MR', brand: 'NovaMed', model: 'NM-MR 700'}]}
   const conversation = new Conversation(db, async () => extraction, 'tester', true)
   const reply = await conversation.turn('They have MR systems')
   expect(reply.observation).toBeUndefined()
-  expect(reply.followUps[0]?.intent).toBe('quantity')
+  expect(reply.suggestionIntent).toBe('quantity')
   expect((await conversation.turn('confirm')).saved).not.toBe(true)
   expect(allObservations(db)).toHaveLength(0)
   expect(() => buildObservation({extraction, customer, rawInput: 'MR', observer: 'tester', observedAt: '2026-09-09', source: 'Text'})).toThrow('Quantity required')

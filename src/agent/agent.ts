@@ -45,6 +45,8 @@ export interface AgentReply {
   suggestionQuestion?: string
   suggestionIntent?: FollowUp['intent']
   suggestionModality?: string
+  /** Explicit workflow controls, separate from Excel value suggestions. */
+  actions?: Array<{ label: string; command: string }>
 }
 
 export interface DuplicateHit {
@@ -147,7 +149,7 @@ function groundCustomer(rawInput: string, extracted: Extraction['customer']): Ex
   const candidates: Array<{ name: string; city: string; country: string }> = []
   const prosePatterns = [
     /\b(?:i['’]?m|i am)\s+at\s+(.{2,80}?)\s+in\s+([^,.\n]{2,60}),\s*([^.?!\n]{2,60}?)(?=[.?!\n]|$)/gi,
-    /\b(?:estoy|me encuentro)\s+en\s+(.{2,80}?)\s+en\s+([^,.\n]{2,60}),\s*([^.?!\n]{2,60}?)(?=[.?!\n]|$)/gi,
+    /\b(?:estoy|stoy|me encuentro)\s+en\s+(.{2,80}?)\s+en\s+([^,.\n]{2,60}),\s*([^.?!\n]{2,60}?)(?=[.?!\n]|$)/gi,
   ]
   for (const pattern of prosePatterns) {
     for (const match of rawInput.matchAll(pattern)) {

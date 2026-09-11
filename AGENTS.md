@@ -89,12 +89,17 @@ scripts/voice-capture.mjs ← demo de transcripción WAV
 Flujo: texto → `extractObservation()` → `handleObservation()` (follow-ups, duplicados,
 estados) → `insertObservation()` → insights.
 
-### Suggestion Chips (chat web)
-- El input de texto se oculta cuando hay chips de sugerencias disponibles
-- Chips se cargan desde `/api/suggestions` (reales de la DB) con fallback hardcodeado
-- `getChatSuggestions(db)` en `db.ts` consulta marcas, modelos, hospitales y ciudades únicos
-- `getSuggestions(followUp, observation)` en `chat.html` selecciona chips por intención
-- Cuando no hay sugerencias para una intención, se muestra el input de texto normal
+### Sugerencias y catálogo estricto
+- `src/store/catalog.ts` carga el JSON verificado contra `data/Dummy_Installed_Base_Hackathon.xlsx`.
+- El catálogo es independiente de SQLite; borrar o añadir observaciones no cambia las opciones.
+- `Conversation` conserva la pregunta pendiente en el servidor. El cliente no elige el campo que se modifica.
+- Las respuestas a preguntas se aplican directamente a su fila, sin otra llamada de inferencia.
+- `src/agent/catalog-review.ts` valida hospital, ciudad, país y la combinación modalidad/marca/modelo/cantidad/edad.
+- Solo se permite revisar/guardar cuando todos esos campos coinciden con una fila del dataset.
+- Los chips vienen de `reply.suggestions`; no hay marcas, modelos ni rangos numéricos de fallback.
+- `/api/suggestions` y `/api/suggestions/modality` exponen el catálogo inmutable, no la DB editable.
+- `/new`, `new`, `nueva observación`, `skip` y `cancel` descartan el borrador; "no sé" no permite saltarse campos obligatorios.
+- Si no quedan filas del catálogo para un equipo pendiente, `reply.actions` ofrece reiniciar o descartar únicamente ese equipo. `/discard-equipment` solo funciona en ese estado; conserva las filas anteriores y vuelve a validar. Los controles no se mezclan con sugerencias de valores del Excel.
 
 ## i18n (Multiidioma)
 
@@ -121,31 +126,15 @@ Soporte completo para 7 idiomas: en, es, pt, fr, de, it, nl.
 - Templates por idioma para brand, model, age, quantity, customer, location, notes
 - Cada pregunta incluye razón (ej: "Knowing the manufacturer helps track equipment lifecycle")
 
-### Detección de intents multilíngüe (`detectFollowUpIntent`)
-- Regex multiidioma para detectar la intención de una pregunta de follow-up (una sola intención)
-- Marca: brand/marca/marque/hersteller/merk, Edad: age/old/años/ans/jahre/etc.
-- El web manda `intent` y `modality` en el body de `/api/chat` (opcionales); el servidor
-  cae al regex si no vienen (CLI y tests no los mandan)
+## Validación contra el dataset
 
-## Validación contra el dataset (`src/agent/dataset-match.ts`)
-
-El chat está enfocado al vocabulario del installed base: marcas, modelos y hospitales
-que existen en la DB. `matchDataset()` compara con normalización de acentos/caso y
-distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
-("aurelia" → "Aurelia Health", "DemoCare Pacific" → "Hospital DemoCare Pacific").
-
-- **Respuestas de follow-up** (brand/model/customer): en `Conversation.turn()` antes de
-  inferir. Exacto → se canoniza a la grafía del dataset; cercano → reply con
-  `suggestions` + `suggestionQuestion/Intent/Modality` (chips en el frontend, sin gastar
-  GPU); inválido → se rechaza y se ofrecen las opciones más cercanas. Si la DB no tiene
-  vocabulario (instalación limpia) la validación se saltea para no bloquear.
-- **Extracción del LLM**: `alignWithDataset()` descarta brand/model inventados que no
-  existen en la DB (vuelve a preguntar con opciones válidas) y canoniza near-matches.
-  El nombre del hospital solo se canoniza, nunca se descarta (así se agregan hospitales nuevos).
-- **"No sé"** (`isUnknownAnswer`): declina el campo sin guardarlo y no se vuelve a preguntar
-  (`this.declined`, se limpia en `reset()`).
-- Umbral close = 0.72; sugerencias ordenadas por score (máx 5).
-- La validación NO aplica a age/quantity (parseo numérico) ni a notes/location (texto libre).
+Los textos del LLM se validan con `parseExtraction()` y después se revisan contra el catálogo.
+Las coincidencias exactas toleran mayúsculas y acentos. Las aproximadas se ofrecen como
+opciones que el usuario debe elegir; nunca se sustituyen silenciosamente. No se crean
+hospitales nuevos ni se aceptan cantidades/edades fuera de la fila correspondiente.
+La base de datos puede estar vacía y la validación sigue siendo obligatoria. Si el archivo
+del catálogo falta o tiene un formato inválido, la aplicación falla al iniciar en vez de
+aceptar entradas sin validar. `MOSAIC_SEED_PATH` apunta al recurso bundleado en Electron.
 
 ## Mejoras en la conversación
 
@@ -183,8 +172,8 @@ distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
   individualmente ("2 MR viejos + 1 nuevo" matchea "MR >7 años").
 - **Language locking**: `Conversation.setLockedLanguage()` debe llamarse ANTES del primer `turn()`.
   El `lang` en el request body se aplica solo al crear la sesión, no en sesiones existentes.
-- **Suggestion chips**: el input se oculta cuando hay chips. Si el usuario necesita escribir
-  algo que no está en los chips, debe usar "Otro..." o esperar a que no haya chips.
+- **Suggestion chips**: también se puede responder desde el cuadro principal, pero el servidor
+  siempre valida la respuesta contra la pregunta pendiente y el catálogo.
 - **Empaquetado desktop**: `asar: false` es obligatorio — el worker `bare` del SDK no puede
   leer dentro de un asar. `npmRebuild: false` porque better-sqlite3 v13 trae prebuilds N-API.
   `files` poda `prebuilds/` de otras plataformas (android/ios/darwin/linux/win32-arm64).
@@ -284,7 +273,7 @@ distancia de Levenshtein (tolerancia a typos), más reglas de abreviatura
 - `GET /api/ready` — estado de carga del modelo `{ ready, progress }`
 - `GET /onboarding` — página de primera ejecución (solo desktop)
 - `GET /mosaic-logo.png` — logo servido para landing/onboarding
-- `GET /api/suggestions` — retorna marcas, modelos, hospitales y ciudades de la DB para chips
+- `GET /api/suggestions` — retorna opciones del catálogo de Excel para chips
 - `GET /api/stats` — estadísticas globales
 - `GET /api/customers` — Customer 360 de todos los clientes
 - `GET /api/customers/refresh` — candidatos para refrescar

@@ -8,13 +8,14 @@ import { join } from 'node:path'
 /**
  * Deterministic end-to-end test: the app runs with MOSAIC_LLM_URL pointed at a
  * local stub that mimics the OpenAI-compatible QVAC server, so no model is
- * downloaded and the whole desktop flow (onboarding, seeding, chat) is tested.
+ * downloaded for extraction and the desktop flow (onboarding, catalog, chat) is tested.
  */
 const EXTRACTION = {
   customer: { name: 'Hospital DemoCare Pacific', city: 'Panama City', country: 'Panama' },
   equipment: [
     { modality: 'MR', quantity: 2 },
     { modality: 'CT', quantity: 1 },
+    { modality: 'MR', quantity: 2 },
   ],
   missingFields: [],
 }
@@ -78,12 +79,37 @@ test('first run onboards, greets in the chosen language and chats; settings pers
     // The Demo button loads the bundled dummy dataset on demand.
     await page.locator('#demo-btn').click()
     await expect.poll(readObservations).toBe(20)
+    // Clear only this test's temporary DB to verify catalog validation without seeded observations.
+    const cleared = await page.request.post(new URL('/api/db/clear', page.url()).href)
+    expect(cleared.ok()).toBe(true)
+    await expect.poll(readObservations).toBe(0)
 
     await page.locator('#chat-input').fill(
       'I am at Hospital DemoCare Pacific in Panama. They have two MR systems and one CT.',
     )
     await page.locator('#send-btn').click()
     await expect(page.locator('#messages')).toContainText(/MR/i, { timeout: 60_000 })
+    const chip = (name: string) => page.getByRole('button', {name, exact:true}).filter({visible:true}).last()
+    await expect(chip('NovaMed')).toBeEnabled()
+    await expect(page.getByRole('button', {name:'Philips', exact:true})).toHaveCount(0)
+    await page.locator('#chat-input').fill('Philips')
+    await page.locator('#send-btn').click()
+    await expect(page.locator('#messages')).toContainText('does not match the dataset')
+    for (const value of ['NovaMed','NM-MR 700','7','Aurelia Health','AH-CT 320','5']) {
+      await expect(chip(value)).toBeEnabled()
+      await chip(value).click()
+    }
+    await expect(page.locator('#messages')).toContainText('Equipment 3')
+    await expect(chip('New observation')).toBeEnabled()
+    await expect(chip('Discard only this equipment')).toBeEnabled()
+    await expect(page.getByRole('button',{name:'Confirmar y guardar',exact:true})).toHaveCount(0)
+    await chip('Discard only this equipment').click()
+    await expect(page.getByRole('button',{name:'Confirmar y guardar',exact:true})).toBeEnabled()
+    await page.getByRole('button',{name:'Confirmar y guardar',exact:true}).click()
+    await expect.poll(async () => {
+      const after = await page.evaluate(async () => (await fetch('/api/stats')).json() as Promise<{totalObservations:number}>)
+      return after.totalObservations
+    }).toBe(1)
     await app.close()
 
     // ── Second run: onboarding is skipped and language stays locked ───────
